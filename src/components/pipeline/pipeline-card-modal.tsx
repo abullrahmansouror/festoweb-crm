@@ -4,14 +4,25 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X } from 'lucide-react';
-import type { PipelineCard, PipelineStage, ServiceType } from '@/types';
+import type { PipelineCard, ServiceType } from '@/types';
+
+// Must match DB check constraint exactly
+const DB_STAGES = [
+  'Lead',
+  'Discovery Call',
+  'Deal in Meeting',
+  'Paid Deposit 50%',
+  'In Progress',
+  'Review',
+  'Completed Paid 50%',
+] as const;
 
 const schema = z.object({
   client_name: z.string().min(1, 'Client name is required'),
   company_name: z.string().optional(),
   service_type: z.enum(['website_design','website_redesign','landing_page','maintenance','ecommerce']),
   value: z.coerce.number().optional(),
-  stage: z.enum(['lead','discovery_call','deal_in_meeting','paid_deposit','in_progress','review','completed_paid']),
+  stage: z.enum(DB_STAGES),
   notes: z.string().optional(),
   next_follow_up: z.string().optional(),
 });
@@ -20,6 +31,7 @@ type FormData = z.infer<typeof schema>;
 
 interface PipelineCardModalProps {
   card: PipelineCard | null;
+  stages?: string[];
   onSave: (card: PipelineCard) => void;
   onClose: () => void;
 }
@@ -30,16 +42,23 @@ export function PipelineCardModal({ card, onSave, onClose }: PipelineCardModalPr
     defaultValues: {
       client_name: card?.client_name || '',
       company_name: card?.company_name || '',
-      service_type: card?.service_type || 'website_design',
+      service_type: (card?.service_type as any) || 'website_design',
       value: card?.value || undefined,
-      stage: card?.stage || 'lead',
+      stage: (card?.stage as any) || 'Lead',
       notes: card?.notes || '',
       next_follow_up: card?.next_follow_up ? new Date(card.next_follow_up).toISOString().slice(0,16) : '',
     },
   });
 
   const onSubmit = (data: FormData) => {
-    onSave({ ...data, id: card?.id || '', service_type: data.service_type as ServiceType, stage: data.stage as PipelineStage, created_at: card?.created_at || new Date().toISOString(), updated_at: new Date().toISOString() } as PipelineCard);
+    onSave({
+      ...data,
+      id: card?.id || '',
+      service_type: data.service_type as ServiceType,
+      stage: data.stage as any,
+      created_at: card?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as PipelineCard);
   };
 
   return (
@@ -80,13 +99,9 @@ export function PipelineCardModal({ card, onSave, onClose }: PipelineCardModalPr
           <div>
             <label className="text-text-muted text-xs mb-1 block">Stage</label>
             <select {...register('stage')} className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary">
-              <option value="lead">Lead</option>
-              <option value="discovery_call">Discovery Call</option>
-              <option value="deal_in_meeting">Deal in Meeting</option>
-              <option value="paid_deposit">Paid Deposit 50%</option>
-              <option value="in_progress">In Progress</option>
-              <option value="review">Review</option>
-              <option value="completed_paid">Completed Paid</option>
+              {DB_STAGES.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
           </div>
           <div>
