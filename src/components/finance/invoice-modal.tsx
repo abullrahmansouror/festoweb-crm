@@ -4,6 +4,9 @@ import { useForm } from 'react-hook-form';
 import { X } from 'lucide-react';
 import type { Invoice } from '@/types';
 
+// Must match DB check constraint: 'Draft','Sent','Paid','Overdue'
+const DB_STATUSES = ['Draft', 'Sent', 'Paid', 'Overdue'] as const;
+
 export function InvoiceModal({ invoice, onSave, onClose }: { invoice: Invoice | null; onSave: (i: Invoice) => void; onClose: () => void }) {
   const { register, handleSubmit } = useForm({
     defaultValues: {
@@ -11,7 +14,7 @@ export function InvoiceModal({ invoice, onSave, onClose }: { invoice: Invoice | 
       description: invoice?.description || '',
       amount: invoice?.amount || 0,
       type: invoice?.type || 'income',
-      status: invoice?.status || 'pending',
+      status: (invoice?.status as any) || 'Draft',
       date: invoice?.date || new Date().toISOString().slice(0,10),
       due_date: invoice?.due_date || '',
     },
@@ -52,9 +55,9 @@ export function InvoiceModal({ invoice, onSave, onClose }: { invoice: Invoice | 
             <div>
               <label className="text-text-muted text-xs mb-1 block">Status</label>
               <select {...register('status')} className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary">
-                <option value="pending">Pending</option>
-                <option value="paid">Paid</option>
-                <option value="overdue">Overdue</option>
+                {DB_STATUSES.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
             </div>
             <div>

@@ -16,10 +16,8 @@ const KPI = ({ icon: Icon, label, value, color }: { icon: any; label: string; va
   </div>
 );
 
-// Auto-generate invoice number like INV-20260512-001
 const generateInvoiceNumber = () => {
-  const date = new Date();
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+  const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
   const rand = Math.floor(Math.random() * 900) + 100;
   return `INV-${dateStr}-${rand}`;
 };
@@ -46,10 +44,11 @@ export default function FinancePage() {
 
   useEffect(() => { fetchInvoices(); }, []);
 
-  const income = invoices.filter(i => i.type === 'income' && i.status === 'paid').reduce((s, i) => s + (i.amount || 0), 0);
-  const pending = invoices.filter(i => i.type === 'income' && i.status === 'pending').reduce((s, i) => s + (i.amount || 0), 0);
+  // Use capitalized status values matching DB constraint: Draft, Sent, Paid, Overdue
+  const income   = invoices.filter(i => i.type === 'income' && i.status === 'Paid').reduce((s, i) => s + (i.amount || 0), 0);
+  const pending  = invoices.filter(i => i.type === 'income' && i.status === 'Sent').reduce((s, i) => s + (i.amount || 0), 0);
   const expenses = invoices.filter(i => i.type === 'expense').reduce((s, i) => s + (i.amount || 0), 0);
-  const overdue = invoices.filter(i => i.status === 'overdue').length;
+  const overdue  = invoices.filter(i => i.status === 'Overdue').length;
 
   const handleSave = async (inv: Invoice) => {
     const payload = {
@@ -66,7 +65,6 @@ export default function FinancePage() {
       const { error: err } = await supabase.from('invoices').update(payload).eq('id', inv.id);
       if (err) { setError(err.message); return; }
     } else {
-      // invoice_number is NOT NULL — generate one automatically
       const { error: err } = await supabase.from('invoices').insert([{
         ...payload,
         invoice_number: generateInvoiceNumber(),
@@ -81,9 +79,10 @@ export default function FinancePage() {
   };
 
   const statusColors: Record<string, string> = {
-    paid: 'bg-accent/10 text-accent',
-    pending: 'bg-yellow-400/10 text-yellow-400',
-    overdue: 'bg-red-400/10 text-red-400',
+    Paid: 'bg-accent/10 text-accent',
+    Sent: 'bg-blue-400/10 text-blue-400',
+    Draft: 'bg-surface-dynamic text-text-muted',
+    Overdue: 'bg-red-400/10 text-red-400',
   };
 
   return (
@@ -105,10 +104,10 @@ export default function FinancePage() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI icon={TrendingUp} label="Income Received" value={`SAR ${income.toLocaleString()}`} color="bg-accent/10 text-accent" />
-        <KPI icon={DollarSign} label="Pending" value={`SAR ${pending.toLocaleString()}`} color="bg-yellow-400/10 text-yellow-400" />
-        <KPI icon={TrendingDown} label="Expenses" value={`SAR ${expenses.toLocaleString()}`} color="bg-red-400/10 text-red-400" />
-        <KPI icon={AlertCircle} label="Overdue" value={`${overdue} invoices`} color="bg-orange-400/10 text-orange-400" />
+        <KPI icon={TrendingUp}  label="Income Received" value={`SAR ${income.toLocaleString()}`}   color="bg-accent/10 text-accent" />
+        <KPI icon={DollarSign}  label="Pending (Sent)"  value={`SAR ${pending.toLocaleString()}`}  color="bg-blue-400/10 text-blue-400" />
+        <KPI icon={TrendingDown} label="Expenses"       value={`SAR ${expenses.toLocaleString()}`} color="bg-red-400/10 text-red-400" />
+        <KPI icon={AlertCircle} label="Overdue"         value={`${overdue} invoices`}               color="bg-orange-400/10 text-orange-400" />
       </div>
 
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
@@ -139,7 +138,6 @@ export default function FinancePage() {
                     <td className="px-4 py-3">
                       <p className="text-text-primary text-sm font-medium">{inv.client_name}</p>
                       <p className="text-text-faint text-xs">{inv.description}</p>
-
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-1 rounded-full ${inv.type === 'income' ? 'bg-accent/10 text-accent' : 'bg-red-400/10 text-red-400'}`}>{inv.type}</span>
