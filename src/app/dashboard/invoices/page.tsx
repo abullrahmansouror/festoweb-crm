@@ -7,6 +7,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { Plus, Download, Pencil, Trash2, Search } from 'lucide-react';
 import { InvoiceModal } from '@/components/invoices/invoice-modal';
 import { generateInvoicePDF } from '@/lib/pdf';
+import Link from 'next/link';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-500/10 text-gray-400',
@@ -108,7 +109,11 @@ export default function InvoicesPage() {
               </td></tr>
             ) : filtered.map(inv => (
               <tr key={inv.id} className="border-b border-border hover:bg-surface2 transition-colors">
-                <td className="px-4 py-3 text-sm text-primary font-medium">{inv.invoice_number}</td>
+                <td className="px-4 py-3 text-sm font-medium">
+                  <Link href={`/dashboard/invoices/${inv.id}`} className="text-primary hover:underline">
+                    {inv.invoice_number}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 text-sm text-text-primary">{inv.clients?.full_name || '-'}</td>
                 <td className="px-4 py-3 text-sm text-text-muted">{formatCurrency(inv.subtotal, inv.currency)}</td>
                 <td className="px-4 py-3 text-sm text-text-muted">{inv.tax_rate}%</td>
@@ -120,7 +125,7 @@ export default function InvoicesPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <button onClick={() => generateInvoicePDF(inv)}
-                      className="p-1.5 hover:bg-surface2 rounded text-text-faint hover:text-accent transition-colors">
+                      className="p-1.5 hover:bg-surface2 rounded text-text-faint hover:text-accent transition-colors" title="Export PDF">
                       <Download size={14} />
                     </button>
                     <button onClick={() => { setEditing(inv); setShowModal(true); }}
