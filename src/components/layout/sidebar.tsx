@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Users, GitBranch, DollarSign, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,6 +13,24 @@ const NAV_ITEMS = [
   { href: '/dashboard/reports', icon: BarChart2, label: 'Reports' },
 ];
 
+function FestowebIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 384 384"
+      width={size}
+      height={size}
+      aria-label="Festoweb"
+    >
+      <path
+        fill="#3dcf8e"
+        fillRule="nonzero"
+        d="M239.523 35.879c1.809-7.238-1.625-14.765-8.277-18.144-6.657-3.379-14.758-1.711-19.539 4.023L51.707 213.758c-3.973 4.77-4.829 11.407-2.196 17.031C52.144 236.406 57.793 240 64 240h107.508l-27.031 108.121c-1.809 7.238 1.624 14.765 8.28 18.144 6.653 3.379 14.758 1.711 19.535-4.023l160-192c3.973-4.77 4.832-11.406 2.196-17.027C331.855 147.59 326.207 144 320 144H212.492Z"
+      />
+    </svg>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
 
@@ -22,13 +39,9 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-5 py-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <Image
-            src="/festoweb-icon.svg"
-            alt="Festoweb Logo"
-            width={32}
-            height={32}
-            className="rounded-lg shrink-0"
-          />
+          <div className="w-8 h-8 rounded-lg bg-[#121212] flex items-center justify-center shrink-0">
+            <FestowebIcon size={20} />
+          </div>
           <div>
             <p className="text-text-primary font-bold text-sm leading-none">Festoweb</p>
             <p className="text-text-faint text-xs mt-0.5">CRM</p>
@@ -39,7 +52,9 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map(item => {
-          const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+          const active =
+            pathname === item.href ||
+            (item.href !== '/dashboard' && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
@@ -58,7 +73,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Settings at bottom */}
+      {/* Settings */}
       <div className="p-3 border-t border-border">
         <Link
           href="/dashboard/settings"
