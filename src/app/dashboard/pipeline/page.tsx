@@ -17,28 +17,6 @@ const STAGES: { id: string; label: string; color: string }[] = [
   { id: 'Completed Paid 50%', label: 'Completed Paid 50%', color: 'border-t-accent' },
 ];
 
-async function sendStageEmail(card: PipelineCard & { client_email?: string }) {
-  const emailToSend = (card as any).client_email || (card as any).email;
-  if (!emailToSend) return;
-  try {
-    const res = await fetch('/api/notify-stage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientName: card.client_name,
-        clientEmail: emailToSend,
-        stage: card.stage,
-        service: card.service_type,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) console.error('Email API error:', data);
-    else console.log('Email sent:', data);
-  } catch (e) {
-    console.error('Email send failed:', e);
-  }
-}
-
 export default function PipelinePage() {
   const [cards, setCards] = useState<PipelineCard[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -80,17 +58,12 @@ export default function PipelinePage() {
 
   const handleDrop = async (stage: string) => {
     if (!draggingId) return;
-    const card = cards.find(c => c.id === draggingId);
     await supabase.from('pipeline_leads').update({ stage, updated_at: new Date().toISOString() }).eq('id', draggingId);
-    if (card) await sendStageEmail({ ...card, stage } as any);
     setDraggingId(null);
     fetchCards();
   };
 
   const handleSave = async (card: PipelineCard & { client_email?: string }) => {
-    const prevStage = editingCard?.stage;
-    const stageChanged = editingCard && prevStage !== card.stage;
-
     const payload = {
       client_name: card.client_name,
       client_email: (card as any).client_email || null,
@@ -106,13 +79,11 @@ export default function PipelinePage() {
     if (editingCard) {
       const { error: err } = await supabase.from('pipeline_leads').update(payload).eq('id', card.id);
       if (err) { setError(err.message); return; }
-      if (stageChanged) await sendStageEmail(card as any);
     } else {
       const { error: err } = await supabase
         .from('pipeline_leads')
         .insert([{ ...payload, created_at: new Date().toISOString() }]);
       if (err) { setError(err.message); return; }
-      await sendStageEmail(card as any);
     }
 
     setError(null);
