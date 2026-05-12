@@ -1,122 +1,124 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { Client } from '@/types';
-import { formatDate } from '@/lib/utils';
-import { Plus, Search, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Search, Filter } from 'lucide-react';
+import { ClientCard } from '@/components/clients/client-card';
 import { ClientModal } from '@/components/clients/client-modal';
+import { cn } from '@/lib/utils';
+import type { Client } from '@/types';
+
+const mockClients: Client[] = [
+  { id: '1', full_name: 'Ahmed Al-Rashid', company_name: 'Al-Rashid Group', email: 'ahmed@alrashid.com', phone: '+966501234567', whatsapp: '+966501234567', country: 'Saudi Arabia', industry: 'Retail', website_url: 'https://alrashid.com', notes: 'VIP client', status: 'active', created_at: '2024-01-15', updated_at: '2024-01-15' },
+  { id: '2', full_name: 'Mohammed Salem', company_name: 'Salem Stores', email: 'mohammed@salem.com', phone: '+966507654321', whatsapp: '+966507654321', country: 'Saudi Arabia', industry: 'E-commerce', website_url: '', notes: '', status: 'active', created_at: '2024-02-10', updated_at: '2024-02-10' },
+  { id: '3', full_name: 'Sarah Johnson', company_name: 'TechVision Ltd', email: 'sarah@techvision.com', phone: '+1234567890', whatsapp: '', country: 'United States', industry: 'Technology', website_url: 'https://techvision.com', notes: 'Referred by Ahmed', status: 'active', created_at: '2024-03-05', updated_at: '2024-03-05' },
+  { id: '4', full_name: 'Khalid Al-Otaibi', company_name: 'Otaibi Real Estate', email: 'khalid@otaibi.com', phone: '+966509876543', whatsapp: '+966509876543', country: 'Saudi Arabia', industry: 'Real Estate', website_url: '', notes: '', status: 'prospect', created_at: '2024-03-20', updated_at: '2024-03-20' },
+];
+
+const statusFilters = ['all', 'active', 'inactive', 'prospect'];
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<Client[]>(mockClients);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Client | null>(null);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
 
-  async function fetchClients() {
-    const supabase = createClient();
-    const { data } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
-    setClients(data || []);
-    setLoading(false);
-  }
+  const filtered = clients.filter((c) => {
+    const matchSearch =
+      c.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      (c.company_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      c.email.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || c.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
-  useEffect(() => { fetchClients(); }, []);
+  const handleSave = (client: Client) => {
+    if (editingClient) {
+      setClients((prev) => prev.map((c) => (c.id === client.id ? client : c)));
+    } else {
+      setClients((prev) => [...prev, { ...client, id: Date.now().toString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+    }
+    setShowModal(false);
+    setEditingClient(null);
+  };
 
-  async function deleteClient(id: string) {
-    if (!confirm('Delete this client?')) return;
-    const supabase = createClient();
-    await supabase.from('clients').delete().eq('id', id);
-    fetchClients();
-  }
-
-  const filtered = clients.filter(c =>
-    c.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    c.email.toLowerCase().includes(search.toLowerCase()) ||
-    (c.company_name || '').toLowerCase().includes(search.toLowerCase())
-  );
-
-  const statusColor = (s: string) => ({
-    active: 'bg-accent/10 text-accent',
-    inactive: 'bg-error/10 text-error',
-    prospect: 'bg-warning/10 text-warning',
-  }[s] || '');
+  const handleDelete = (id: string) => {
+    setClients((prev) => prev.filter((c) => c.id !== id));
+  };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Clients</h1>
-          <p className="text-text-muted text-sm">{clients.length} total clients</p>
+          <p className="text-text-muted text-sm mt-1">{clients.length} total clients</p>
         </div>
-        <button onClick={() => { setEditing(null); setShowModal(true); }}
-          className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          <Plus size={16} /> Add Client
+        <button
+          onClick={() => { setEditingClient(null); setShowModal(true); }}
+          className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          <Plus size={16} />
+          Add Client
         </button>
       </div>
 
-      <div className="flex items-center gap-3 bg-surface border border-border rounded-lg px-3 py-2 w-full max-w-sm">
-        <Search size={15} className="text-text-faint" />
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search clients..."
-          className="bg-transparent text-sm text-text-primary placeholder-text-faint focus:outline-none w-full" />
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2 flex-1">
+          <Search size={15} className="text-text-faint" />
+          <input
+            type="text"
+            placeholder="Search clients..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-transparent text-sm text-text-primary placeholder-text-faint focus:outline-none w-full"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter size={15} className="text-text-faint" />
+          {statusFilters.map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={cn(
+                'px-3 py-2 rounded-lg text-xs font-medium capitalize transition-colors',
+                statusFilter === s
+                  ? 'bg-primary text-white'
+                  : 'bg-surface border border-border text-text-muted hover:text-text-primary'
+              )}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border">
-              {['Name', 'Company', 'Email', 'Country', 'Status', 'Created', 'Actions'].map(h => (
-                <th key={h} className="text-left text-xs text-text-faint font-medium px-4 py-3">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7} className="text-center py-12 text-text-muted">Loading...</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-12 text-text-muted">No clients found</td></tr>
-            ) : filtered.map(client => (
-              <tr key={client.id} className="border-b border-border hover:bg-surface2 transition-colors">
-                <td className="px-4 py-3 text-sm text-text-primary font-medium">{client.full_name}</td>
-                <td className="px-4 py-3 text-sm text-text-muted">{client.company_name || '-'}</td>
-                <td className="px-4 py-3 text-sm text-text-muted">{client.email}</td>
-                <td className="px-4 py-3 text-sm text-text-muted">{client.country || '-'}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(client.status)}`}>
-                    {client.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-sm text-text-faint">{formatDate(client.created_at)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {client.website_url && (
-                      <a href={client.website_url} target="_blank" rel="noopener noreferrer"
-                        className="p-1.5 hover:bg-surface2 rounded text-text-faint hover:text-text-primary transition-colors">
-                        <ExternalLink size={14} />
-                      </a>
-                    )}
-                    <button onClick={() => { setEditing(client); setShowModal(true); }}
-                      className="p-1.5 hover:bg-surface2 rounded text-text-faint hover:text-primary transition-colors">
-                      <Pencil size={14} />
-                    </button>
-                    <button onClick={() => deleteClient(client.id)}
-                      className="p-1.5 hover:bg-surface2 rounded text-text-faint hover:text-error transition-colors">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Client Grid */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-text-muted">No clients found</p>
+          <button onClick={() => { setEditingClient(null); setShowModal(true); }} className="mt-3 text-primary text-sm hover:underline">Add your first client</button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map((client) => (
+            <ClientCard
+              key={client.id}
+              client={client}
+              onEdit={(c) => { setEditingClient(c); setShowModal(true); }}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
 
+      {/* Modal */}
       {showModal && (
         <ClientModal
-          client={editing}
-          onClose={() => setShowModal(false)}
-          onSave={() => { setShowModal(false); fetchClients(); }}
+          client={editingClient}
+          onSave={handleSave}
+          onClose={() => { setShowModal(false); setEditingClient(null); }}
         />
       )}
     </div>
