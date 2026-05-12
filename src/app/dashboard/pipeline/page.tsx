@@ -18,18 +18,22 @@ const STAGES: { id: string; label: string; color: string }[] = [
 ];
 
 async function sendStageEmail(card: PipelineCard & { client_email?: string }) {
-  if (!card.client_email) return;
+  const emailToSend = (card as any).client_email || (card as any).email;
+  if (!emailToSend) return;
   try {
-    await fetch('/api/notify-stage', {
+    const res = await fetch('/api/notify-stage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         clientName: card.client_name,
-        clientEmail: card.client_email,
+        clientEmail: emailToSend,
         stage: card.stage,
         service: card.service_type,
       }),
     });
+    const data = await res.json();
+    if (!res.ok) console.error('Email API error:', data);
+    else console.log('Email sent:', data);
   } catch (e) {
     console.error('Email send failed:', e);
   }
@@ -55,7 +59,7 @@ export default function PipelinePage() {
     else if (data) setCards(data.map((d: any) => ({
       id: d.id,
       client_name: d.client_name,
-      client_email: d.client_email || '',
+      client_email: d.client_email || d.email || '',
       company_name: d.company,
       service_type: d.service,
       value: d.value,
@@ -84,8 +88,9 @@ export default function PipelinePage() {
   };
 
   const handleSave = async (card: PipelineCard & { client_email?: string }) => {
-    const isStageChanged = editingCard && editingCard.stage !== card.stage;
+    const prevStage = editingCard?.stage;
     const isNew = !editingCard;
+    const stageChanged = editingCard && prevStage !== card.stage;
 
     const payload = {
       client_name: card.client_name,
@@ -102,11 +107,15 @@ export default function PipelinePage() {
     if (editingCard) {
       const { error: err } = await supabase.from('pipeline_leads').update(payload).eq('id', card.id);
       if (err) { setError(err.message); return; }
-      if (isStageChanged) await sendStageEmail(card as any);
+      // Send email whenever stage changes
+      if (stageChanged) await sendStageEmail(card as any);
     } else {
-      const { error: err } = await supabase.from('pipeline_leads').insert([{ ...payload, created_at: new Date().toISOString() }]);
+      const { error: err } = await supabase
+        .from('pipeline_leads')
+        .insert([{ ...payload, created_at: new Date().toISOString() }]);
       if (err) { setError(err.message); return; }
-      if (isNew) await sendStageEmail(card as any);
+      // Send welcome email for new deals that have an email
+      await sendStageEmail(card as any);
     }
 
     setError(null);
@@ -155,7 +164,7 @@ export default function PipelinePage() {
               onEdit={(card) => { setEditingCard(card); setShowModal(true); }}
               onDelete={handleDelete}
             />
-          ))}
+          )}
         </div>
       )}
 
