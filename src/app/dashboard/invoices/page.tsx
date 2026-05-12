@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Invoice } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { Plus, Download, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Download, Pencil, Trash2, Search } from 'lucide-react';
 import { InvoiceModal } from '@/components/invoices/invoice-modal';
 import { generateInvoicePDF } from '@/lib/pdf';
 
@@ -20,6 +20,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [search, setSearch] = useState('');
 
   async function fetchInvoices() {
     const supabase = createClient();
@@ -32,6 +33,17 @@ export default function InvoicesPage() {
   }
 
   useEffect(() => { fetchInvoices(); }, []);
+
+  const filtered = invoices.filter(inv => {
+    const q = search.toLowerCase();
+    return (
+      inv.invoice_number?.toLowerCase().includes(q) ||
+      inv.clients?.full_name?.toLowerCase().includes(q) ||
+      inv.clients?.company_name?.toLowerCase().includes(q) ||
+      inv.status?.toLowerCase().includes(q) ||
+      String(inv.total).includes(q)
+    );
+  });
 
   async function deleteInvoice(id: string) {
     if (!confirm('Delete this invoice?')) return;
@@ -66,6 +78,18 @@ export default function InvoicesPage() {
         ))}
       </div>
 
+      {/* Search Bar */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" />
+        <input
+          type="text"
+          placeholder="Search by invoice #, client, status..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full bg-surface border border-border rounded-lg pl-9 pr-4 py-2 text-sm text-text-primary placeholder:text-text-faint focus:outline-none focus:border-primary transition-colors"
+        />
+      </div>
+
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
         <table className="w-full">
           <thead>
@@ -78,9 +102,11 @@ export default function InvoicesPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={8} className="text-center py-10 text-text-muted">Loading...</td></tr>
-            ) : invoices.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-10 text-text-muted">No invoices yet</td></tr>
-            ) : invoices.map(inv => (
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={8} className="text-center py-10 text-text-muted">
+                {search ? `No results for "${search}"` : 'No invoices yet'}
+              </td></tr>
+            ) : filtered.map(inv => (
               <tr key={inv.id} className="border-b border-border hover:bg-surface2 transition-colors">
                 <td className="px-4 py-3 text-sm text-primary font-medium">{inv.invoice_number}</td>
                 <td className="px-4 py-3 text-sm text-text-primary">{inv.clients?.full_name || '-'}</td>
