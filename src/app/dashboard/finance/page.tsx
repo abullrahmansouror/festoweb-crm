@@ -18,7 +18,7 @@ const KPI = ({ icon: Icon, label, value, color }: { icon: any; label: string; va
 );
 
 const generateInvoiceNumber = () => {
-  const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const rand = Math.floor(Math.random() * 900) + 100;
   return `INV-${dateStr}-${rand}`;
 };
@@ -26,7 +26,7 @@ const generateInvoiceNumber = () => {
 export default function FinancePage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -52,17 +52,29 @@ export default function FinancePage() {
   const expenses = invoices.filter(i => i.type === 'expense').reduce((s, i) => s + (i.amount || 0), 0);
   const overdue  = invoices.filter(i => i.status === 'Overdue').length;
 
-  const handleSave = async (inv: Invoice) => {
+  const handleSave = async (inv: any) => {
+    const taxRate  = Number(inv.tax_rate || 0);
+    const amount   = Number(inv.amount   || 0);
+    const taxAmt   = (amount * taxRate) / 100;
+    const total    = amount + taxAmt;
+
     const payload = {
-      client_name: inv.client_name,
-      amount: inv.amount,
-      type: inv.type,
-      status: inv.status,
-      description: inv.description,
-      date: inv.date || new Date().toISOString().split('T')[0],
-      due_date: inv.due_date || null,
-      updated_at: new Date().toISOString(),
+      client_name:  inv.client_name,
+      client_email: inv.client_email  || null,
+      client_phone: inv.client_phone  || null,
+      amount,
+      tax_rate:     taxRate           || null,
+      tax_amount:   taxAmt            || null,
+      total:        total,
+      type:         inv.type,
+      status:       inv.status,
+      description:  inv.description,
+      note:         inv.note          || null,
+      date:         inv.date          || new Date().toISOString().split('T')[0],
+      due_date:     inv.due_date      || null,
+      updated_at:   new Date().toISOString(),
     };
+
     if (editingInvoice) {
       const { error: err } = await supabase.from('invoices').update(payload).eq('id', inv.id);
       if (err) { setError(err.message); return; }
@@ -90,9 +102,9 @@ export default function FinancePage() {
   };
 
   const statusColors: Record<string, string> = {
-    Paid: 'bg-accent/10 text-accent',
-    Sent: 'bg-blue-400/10 text-blue-400',
-    Draft: 'bg-surface-dynamic text-text-muted',
+    Paid:    'bg-accent/10 text-accent',
+    Sent:    'bg-blue-400/10 text-blue-400',
+    Draft:   'bg-surface-dynamic text-text-muted',
     Overdue: 'bg-red-400/10 text-red-400',
   };
 
@@ -101,7 +113,7 @@ export default function FinancePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Finance</h1>
-          <p className="text-text-muted text-sm mt-1">Invoices, income & expenses</p>
+          <p className="text-text-muted text-sm mt-1">Invoices, income &amp; expenses</p>
         </div>
         <button
           onClick={() => { setEditingInvoice(null); setShowModal(true); }}
@@ -140,77 +152,97 @@ export default function FinancePage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {['#', 'Client / Description', 'Type', 'Amount', 'Status', 'Date', 'Due Date', ''].map(h => (
+                  {['#', 'Client / Description', 'Type', 'Amount', 'Tax%', 'Total', 'Status', 'Date', 'Due Date', ''].map(h => (
                     <th key={h} className="text-left text-text-faint text-xs font-medium px-4 py-3">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {invoices.map(inv => (
-                  <tr key={inv.id} className="border-b border-border/50 hover:bg-surface2 transition-colors">
-                    <td className="px-4 py-3 text-text-faint text-xs tabular-nums">{(inv as any).invoice_number}</td>
-                    <td className="px-4 py-3">
-                      <p className="text-text-primary text-sm font-medium">{inv.client_name}</p>
-                      <p className="text-text-faint text-xs">{inv.description}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full ${inv.type === 'income' ? 'bg-accent/10 text-accent' : 'bg-red-400/10 text-red-400'}`}>{inv.type}</span>
-                    </td>
-                    <td className="px-4 py-3 text-text-primary text-sm font-semibold tabular-nums">SAR {(inv.amount || 0).toLocaleString()}</td>
-                    <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusColors[inv.status] || ''}`}>{inv.status}</span></td>
-                    <td className="px-4 py-3 text-text-muted text-sm">{inv.date}</td>
-                    <td className="px-4 py-3 text-text-muted text-sm">{inv.due_date || '—'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => generateInvoicePDF(inv as any)}
-                          className="flex items-center gap-1 text-text-faint hover:text-primary text-xs transition-colors"
-                          title="Export PDF"
-                        >
-                          <FileDown size={13} /> PDF
-                        </button>
-                        <button
-                          onClick={() => { setEditingInvoice(inv); setShowModal(true); }}
-                          className="text-text-faint hover:text-primary text-xs transition-colors"
-                        >
-                          Edit
-                        </button>
-                        {confirmDeleteId === inv.id ? (
-                          <span className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleDelete(inv.id)}
-                              disabled={deletingId === inv.id}
-                              className="text-red-400 hover:text-red-500 text-xs font-semibold transition-colors disabled:opacity-50"
-                            >
-                              {deletingId === inv.id ? 'Deleting...' : 'Confirm'}
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="text-text-faint hover:text-text-muted text-xs transition-colors ml-1"
-                            >
-                              Cancel
-                            </button>
-                          </span>
-                        ) : (
+                {invoices.map(inv => {
+                  const i = inv as any;
+                  return (
+                    <tr key={inv.id} className="border-b border-border/50 hover:bg-surface2 transition-colors">
+                      <td className="px-4 py-3 text-text-faint text-xs tabular-nums">{i.invoice_number}</td>
+                      <td className="px-4 py-3">
+                        <p className="text-text-primary text-sm font-medium">{inv.client_name}</p>
+                        <p className="text-text-faint text-xs">{inv.description}</p>
+                        {i.client_email && <p className="text-text-faint text-xs">{i.client_email}</p>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          inv.type === 'income' ? 'bg-accent/10 text-accent' : 'bg-red-400/10 text-red-400'
+                        }`}>{inv.type}</span>
+                      </td>
+                      <td className="px-4 py-3 text-text-primary text-sm tabular-nums">SAR {(inv.amount || 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-text-muted text-xs tabular-nums">
+                        {i.tax_rate ? `${i.tax_rate}%` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-text-primary text-sm font-semibold tabular-nums">
+                        SAR {(i.total || inv.amount || 0).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-1 rounded-full ${statusColors[inv.status] || ''}`}>{inv.status}</span>
+                      </td>
+                      <td className="px-4 py-3 text-text-muted text-sm">{inv.date}</td>
+                      <td className="px-4 py-3 text-text-muted text-sm">{inv.due_date || '—'}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
                           <button
-                            onClick={() => setConfirmDeleteId(inv.id)}
-                            className="text-text-faint hover:text-red-400 text-xs transition-colors"
-                            title="Delete invoice"
+                            onClick={() => generateInvoicePDF(i)}
+                            className="flex items-center gap-1 text-text-faint hover:text-primary text-xs transition-colors"
+                            title="Export PDF"
                           >
-                            <Trash2 size={13} />
+                            <FileDown size={13} /> PDF
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <button
+                            onClick={() => { setEditingInvoice(inv); setShowModal(true); }}
+                            className="text-text-faint hover:text-primary text-xs transition-colors"
+                          >
+                            Edit
+                          </button>
+                          {confirmDeleteId === inv.id ? (
+                            <span className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleDelete(inv.id)}
+                                disabled={deletingId === inv.id}
+                                className="text-red-400 hover:text-red-500 text-xs font-semibold transition-colors disabled:opacity-50"
+                              >
+                                {deletingId === inv.id ? 'Deleting...' : 'Confirm'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="text-text-faint hover:text-text-muted text-xs transition-colors ml-1"
+                              >
+                                Cancel
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDeleteId(inv.id)}
+                              className="text-text-faint hover:text-red-400 text-xs transition-colors"
+                              title="Delete invoice"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {showModal && <InvoiceModal invoice={editingInvoice} onSave={handleSave} onClose={() => { setShowModal(false); setEditingInvoice(null); }} />}
+      {showModal && (
+        <InvoiceModal
+          invoice={editingInvoice}
+          onSave={handleSave}
+          onClose={() => { setShowModal(false); setEditingInvoice(null); }}
+        />
+      )}
     </div>
   );
 }
