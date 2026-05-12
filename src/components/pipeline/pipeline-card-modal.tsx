@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { X } from 'lucide-react';
 import type { PipelineCard, ServiceType } from '@/types';
 
-// Must match DB check constraint exactly
 const DB_STAGES = [
   'Lead',
   'Discovery Call',
@@ -19,6 +18,7 @@ const DB_STAGES = [
 
 const schema = z.object({
   client_name: z.string().min(1, 'Client name is required'),
+  client_email: z.string().email('Invalid email').optional().or(z.literal('')),
   company_name: z.string().optional(),
   service_type: z.enum(['website_design','website_redesign','landing_page','maintenance','ecommerce']),
   value: z.coerce.number().optional(),
@@ -41,6 +41,7 @@ export function PipelineCardModal({ card, onSave, onClose }: PipelineCardModalPr
     resolver: zodResolver(schema),
     defaultValues: {
       client_name: card?.client_name || '',
+      client_email: (card as any)?.client_email || '',
       company_name: card?.company_name || '',
       service_type: (card?.service_type as any) || 'website_design',
       value: card?.value || undefined,
@@ -80,6 +81,19 @@ export function PipelineCardModal({ card, onSave, onClose }: PipelineCardModalPr
               <input {...register('company_name')} className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary" />
             </div>
           </div>
+
+          <div>
+            <label className="text-text-muted text-xs mb-1 block">Client Email</label>
+            <input
+              {...register('client_email')}
+              type="email"
+              placeholder="client@example.com"
+              className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary"
+            />
+            {errors.client_email && <p className="text-red-400 text-xs mt-1">{errors.client_email.message}</p>}
+            <p className="text-text-faint text-xs mt-1">Auto-email will be sent when stage changes</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-text-muted text-xs mb-1 block">Service</label>
@@ -96,6 +110,7 @@ export function PipelineCardModal({ card, onSave, onClose }: PipelineCardModalPr
               <input {...register('value')} type="number" className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary" />
             </div>
           </div>
+
           <div>
             <label className="text-text-muted text-xs mb-1 block">Stage</label>
             <select {...register('stage')} className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary">
@@ -104,14 +119,17 @@ export function PipelineCardModal({ card, onSave, onClose }: PipelineCardModalPr
               ))}
             </select>
           </div>
+
           <div>
             <label className="text-text-muted text-xs mb-1 block">Next Follow-up</label>
             <input {...register('next_follow_up')} type="datetime-local" className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary" />
           </div>
+
           <div>
             <label className="text-text-muted text-xs mb-1 block">Notes</label>
             <textarea {...register('notes')} rows={3} className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary resize-none" />
           </div>
+
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 bg-surface2 border border-border text-text-muted hover:text-text-primary px-4 py-2 rounded-lg text-sm transition-colors">Cancel</button>
             <button type="submit" className="flex-1 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">{card ? 'Save Changes' : 'Add Deal'}</button>

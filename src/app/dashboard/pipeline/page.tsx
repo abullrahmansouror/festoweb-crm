@@ -5,9 +5,8 @@ import { Plus } from 'lucide-react';
 import { PipelineColumn } from '@/components/pipeline/pipeline-column';
 import { PipelineCardModal } from '@/components/pipeline/pipeline-card-modal';
 import { createClient } from '@/lib/supabase/client';
-import type { PipelineCard, PipelineStage } from '@/types';
+import type { PipelineCard } from '@/types';
 
-// Stage IDs must match DB check constraint EXACTLY
 const STAGES: { id: string; label: string; color: string }[] = [
   { id: 'Lead', label: 'Lead', color: 'border-t-purple-400' },
   { id: 'Discovery Call', label: 'Discovery Call', color: 'border-t-blue-400' },
@@ -17,6 +16,24 @@ const STAGES: { id: string; label: string; color: string }[] = [
   { id: 'Review', label: 'Review', color: 'border-t-cyan-400' },
   { id: 'Completed Paid 50%', label: 'Completed Paid 50%', color: 'border-t-accent' },
 ];
+
+async function sendStageEmail(card: PipelineCard & { client_email?: string }) {
+  if (!card.client_email) return;
+  try {
+    await fetch('/api/notify-stage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientName: card.client_name,
+        clientEmail: card.client_email,
+        stage: card.stage,
+        service: card.service_type,
+      }),
+    });
+  } catch (e) {
+    console.error('Email send failed:', e);
+  }
+}
 
 export default function PipelinePage() {
   const [cards, setCards] = useState<PipelineCard[]>([]);
@@ -38,6 +55,7 @@ export default function PipelinePage() {
     else if (data) setCards(data.map((d: any) => ({
       id: d.id,
       client_name: d.client_name,
+      client_email: d.client_email || '',
       company_name: d.company,
       service_type: d.service,
       value: d.value,
@@ -58,14 +76,20 @@ export default function PipelinePage() {
 
   const handleDrop = async (stage: string) => {
     if (!draggingId) return;
+    const card = cards.find(c => c.id === draggingId);
     await supabase.from('pipeline_leads').update({ stage, updated_at: new Date().toISOString() }).eq('id', draggingId);
+    if (card) await sendStageEmail({ ...card, stage } as any);
     setDraggingId(null);
     fetchCards();
   };
 
-  const handleSave = async (card: PipelineCard) => {
+  const handleSave = async (card: PipelineCard & { client_email?: string }) => {
+    const isStageChanged = editingCard && editingCard.stage !== card.stage;
+    const isNew = !editingCard;
+
     const payload = {
       client_name: card.client_name,
+      client_email: (card as any).client_email || null,
       company: card.company_name,
       service: card.service_type,
       value: card.value,
@@ -74,13 +98,17 @@ export default function PipelinePage() {
       follow_up_date: card.next_follow_up || null,
       updated_at: new Date().toISOString(),
     };
+
     if (editingCard) {
       const { error: err } = await supabase.from('pipeline_leads').update(payload).eq('id', card.id);
       if (err) { setError(err.message); return; }
+      if (isStageChanged) await sendStageEmail(card as any);
     } else {
       const { error: err } = await supabase.from('pipeline_leads').insert([{ ...payload, created_at: new Date().toISOString() }]);
       if (err) { setError(err.message); return; }
+      if (isNew) await sendStageEmail(card as any);
     }
+
     setError(null);
     setShowModal(false);
     setEditingCard(null);
@@ -135,7 +163,7 @@ export default function PipelinePage() {
         <PipelineCardModal
           card={editingCard}
           stages={STAGES.map(s => s.id)}
-          onSave={handleSave}
+          onSave={handleSave as any}
           onClose={() => { setShowModal(false); setEditingCard(null); }}
         />
       )}
