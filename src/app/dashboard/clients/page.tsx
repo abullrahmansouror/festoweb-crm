@@ -17,16 +17,22 @@ export default function ClientsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const supabase = createClient();
 
   const fetchClients = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    setError(null);
+    const { data, error: err } = await supabase
       .from('clients')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!error && data) setClients(data as Client[]);
+    if (err) {
+      setError(err.message);
+    } else if (data) {
+      setClients(data as Client[]);
+    }
     setLoading(false);
   };
 
@@ -45,9 +51,41 @@ export default function ClientsPage() {
 
   const handleSave = async (client: Client) => {
     if (editingClient) {
-      await supabase.from('clients').update(client).eq('id', client.id);
+      // UPDATE — keep the id
+      const { error: err } = await supabase
+        .from('clients')
+        .update({
+          full_name: client.full_name,
+          company_name: client.company_name,
+          email: client.email,
+          phone: client.phone,
+          whatsapp: client.whatsapp,
+          country: client.country,
+          industry: client.industry,
+          website_url: client.website_url,
+          notes: client.notes,
+          status: client.status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', client.id);
+      if (err) { setError(err.message); return; }
     } else {
-      await supabase.from('clients').insert([{ ...client, created_at: new Date().toISOString() }]);
+      // INSERT — do NOT send id, let Supabase generate the UUID
+      const { error: err } = await supabase.from('clients').insert([{
+        full_name: client.full_name,
+        company_name: client.company_name,
+        email: client.email,
+        phone: client.phone,
+        whatsapp: client.whatsapp,
+        country: client.country,
+        industry: client.industry,
+        website_url: client.website_url,
+        notes: client.notes,
+        status: client.status,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }]);
+      if (err) { setError(err.message); return; }
     }
     setShowModal(false);
     setEditingClient(null);
@@ -73,6 +111,12 @@ export default function ClientsPage() {
           <Plus size={16} /> Add Client
         </button>
       </div>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-lg">
+          ⚠️ Error: {error}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2 flex-1">
@@ -109,7 +153,12 @@ export default function ClientsPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-text-muted">No clients found</p>
-          <button onClick={() => { setEditingClient(null); setShowModal(true); }} className="mt-3 text-primary text-sm hover:underline">Add your first client</button>
+          <button
+            onClick={() => { setEditingClient(null); setShowModal(true); }}
+            className="mt-3 text-primary text-sm hover:underline"
+          >
+            Add your first client
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
