@@ -2,76 +2,73 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Users,
-  Kanban,
-  FolderOpen,
-  FileText,
-  TrendingDown,
-  Bell,
-  HardDrive,
-  MessageSquare,
-  Settings,
-} from 'lucide-react';
+import { LayoutDashboard, Users, GitBranch, DollarSign, CheckSquare, Clock, UserCheck, BarChart2, Settings, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/clients', label: 'Clients', icon: Users },
-  { href: '/dashboard/pipeline', label: 'Pipeline', icon: Kanban },
-  { href: '/dashboard/projects', label: 'Projects', icon: FolderOpen },
-  { href: '/dashboard/invoices', label: 'Invoices', icon: FileText },
-  { href: '/dashboard/expenses', label: 'Expenses', icon: TrendingDown },
-  { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
-  { href: '/dashboard/vault', label: 'File Vault', icon: HardDrive },
-  { href: '/dashboard/communication', label: 'Communication', icon: MessageSquare },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+const NAV_ITEMS = [
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/dashboard/clients', icon: Users, label: 'Clients' },
+  { href: '/dashboard/pipeline', icon: GitBranch, label: 'Pipeline' },
+  { href: '/dashboard/finance', icon: DollarSign, label: 'Finance' },
+  { href: '/dashboard/tasks', icon: CheckSquare, label: 'Tasks' },
+  { href: '/dashboard/time-tracker', icon: Clock, label: 'Time Tracker' },
+  { href: '/dashboard/team', icon: UserCheck, label: 'Team' },
+  { href: '/dashboard/reports', icon: BarChart2, label: 'Reports' },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-60 bg-surface border-r border-border flex flex-col h-full shrink-0">
+    <aside className="w-56 bg-surface border-r border-border h-screen flex flex-col sticky top-0">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-border">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">F</span>
+      <div className="p-5 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
+            <Zap size={14} className="text-white" fill="white" />
           </div>
-          <span className="font-bold text-text-primary text-lg">FestoWeb</span>
+          <div>
+            <p className="text-text-primary font-bold text-sm leading-none">Festoweb</p>
+            <p className="text-text-faint text-xs mt-0.5">CRM</p>
+          </div>
         </div>
-        <p className="text-text-faint text-xs mt-1">Agency CRM</p>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href ||
-            (item.href !== '/dashboard' && pathname.startsWith(item.href));
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        {NAV_ITEMS.map(item => {
+          const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
-                isActive
+                'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+                active
                   ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-text-muted hover:bg-surface2 hover:text-text-primary'
+                  : 'text-text-muted hover:text-text-primary hover:bg-surface2'
               )}
             >
-              <Icon size={17} />
+              <item.icon size={15} />
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-5 py-4 border-t border-border">
-        <p className="text-text-faint text-xs">FestoWeb © 2025</p>
+      {/* Settings at bottom */}
+      <div className="p-3 border-t border-border">
+        <Link
+          href="/dashboard/settings"
+          className={cn(
+            'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+            pathname === '/dashboard/settings'
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface2'
+          )}
+        >
+          <Settings size={15} /> Settings
+        </Link>
       </div>
     </aside>
   );
