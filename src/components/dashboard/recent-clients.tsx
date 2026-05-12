@@ -1,33 +1,55 @@
+'use client';
+import { useEffect, useState } from 'react';
 import { Users } from 'lucide-react';
-
-const clients = [
-  { name: 'Ahmed Al-Rashid', company: 'Al-Rashid Group', country: 'SA', date: '2 days ago' },
-  { name: 'Mohammed Salem', company: 'Salem Stores', country: 'SA', date: '5 days ago' },
-  { name: 'Sarah Johnson', company: 'TechVision Ltd', country: 'US', date: '1 week ago' },
-  { name: 'Khalid Al-Otaibi', company: 'Otaibi Real Estate', country: 'SA', date: '2 weeks ago' },
-];
+import { createClient } from '@/lib/supabase/client';
 
 export function RecentClients() {
+  const [clients, setClients] = useState<any[]>([]);
+  const supabase = createClient();
+
+  useEffect(() => {
+    supabase
+      .from('clients')
+      .select('id, name, company, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5)
+      .then(({ data }) => setClients(data || []));
+  }, []);
+
+  const timeAgo = (date: string) => {
+    const diff = Date.now() - new Date(date).getTime();
+    const d = Math.floor(diff / 86400000);
+    if (d === 0) return 'Today';
+    if (d === 1) return '1 day ago';
+    if (d < 7) return `${d} days ago`;
+    if (d < 30) return `${Math.floor(d/7)} week${Math.floor(d/7)>1?'s':''} ago`;
+    return `${Math.floor(d/30)} month${Math.floor(d/30)>1?'s':''} ago`;
+  };
+
   return (
-    <div className="bg-surface border border-border rounded-xl p-5">
+    <div className="bg-surface border border-border rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-text-primary font-semibold">Recent Clients</h3>
-        <Users size={15} className="text-text-faint" />
+        <p className="text-text-primary font-semibold">Recent Clients</p>
+        <Users size={16} className="text-text-faint" />
       </div>
-      <div className="space-y-3">
-        {clients.map((client) => (
-          <div key={client.name} className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center shrink-0">
-              <span className="text-primary text-xs font-bold">{client.name[0]}</span>
+      {clients.length === 0 ? (
+        <p className="text-text-faint text-sm text-center py-8">No clients yet</p>
+      ) : (
+        <div className="space-y-3">
+          {clients.map(c => (
+            <div key={c.id} className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+                {c.name?.[0]?.toUpperCase() || '?'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-text-primary text-sm font-medium truncate">{c.name}</p>
+                <p className="text-text-faint text-xs truncate">{c.company || '—'}</p>
+              </div>
+              <span className="text-text-faint text-xs shrink-0">{timeAgo(c.created_at)}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-text-primary text-sm font-medium truncate">{client.name}</p>
-              <p className="text-text-faint text-xs truncate">{client.company}</p>
-            </div>
-            <span className="text-text-faint text-xs shrink-0">{client.date}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

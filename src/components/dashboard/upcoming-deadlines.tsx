@@ -1,40 +1,57 @@
+'use client';
+import { useEffect, useState } from 'react';
 import { Clock } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-const deadlines = [
-  { project: 'Al-Rashid E-commerce', client: 'Ahmed Al-Rashid', days: 2, urgent: true },
-  { project: 'Salem Stores Redesign', client: 'Mohammed Salem', days: 5, urgent: true },
-  { project: 'TechVision Landing', client: 'Sarah Johnson', days: 10, urgent: false },
-  { project: 'Otaibi Website', client: 'Khalid Al-Otaibi', days: 18, urgent: false },
-];
+import { createClient } from '@/lib/supabase/client';
 
 export function UpcomingDeadlines() {
+  const [items, setItems] = useState<any[]>([]);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    supabase
+      .from('pipeline_items')
+      .select('id, title, client_name, expected_close_date, status')
+      .not('expected_close_date', 'is', null)
+      .not('status', 'in', '("won","lost")')
+      .gte('expected_close_date', today)
+      .order('expected_close_date', { ascending: true })
+      .limit(5)
+      .then(({ data }) => setItems(data || []));
+  }, []);
+
+  const daysLeft = (date: string) => {
+    const diff = Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
+    return diff;
+  };
+
   return (
-    <div className="bg-surface border border-border rounded-xl p-5">
+    <div className="bg-surface border border-border rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-text-primary font-semibold">Upcoming Deadlines</h3>
-        <Clock size={15} className="text-text-faint" />
+        <p className="text-text-primary font-semibold">Upcoming Deadlines</p>
+        <Clock size={16} className="text-text-faint" />
       </div>
-      <div className="space-y-3">
-        {deadlines.map((d) => (
-          <div key={d.project} className="flex items-center gap-3">
-            <div className={cn(
-              'w-2 h-2 rounded-full shrink-0',
-              d.urgent ? 'bg-red-400' : 'bg-accent'
-            )} />
-            <div className="flex-1 min-w-0">
-              <p className="text-text-primary text-sm font-medium truncate">{d.project}</p>
-              <p className="text-text-faint text-xs">{d.client}</p>
-            </div>
-            <span className={cn(
-              'text-xs font-medium shrink-0',
-              d.urgent ? 'text-red-400' : 'text-text-muted'
-            )}>
-              {d.days}d
-            </span>
-          </div>
-        ))}
-      </div>
+      {items.length === 0 ? (
+        <p className="text-text-faint text-sm text-center py-8">No upcoming deadlines</p>
+      ) : (
+        <div className="space-y-3">
+          {items.map(item => {
+            const days = daysLeft(item.expected_close_date);
+            return (
+              <div key={item.id} className="flex items-start gap-3">
+                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${days <= 3 ? 'bg-red-400' : days <= 7 ? 'bg-yellow-400' : 'bg-accent'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-text-primary text-sm font-medium truncate">{item.title}</p>
+                  <p className="text-text-faint text-xs">{item.client_name || '—'}</p>
+                </div>
+                <span className={`text-xs font-semibold shrink-0 ${
+                  days <= 3 ? 'text-red-400' : days <= 7 ? 'text-yellow-400' : 'text-text-muted'
+                }`}>{days}d</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

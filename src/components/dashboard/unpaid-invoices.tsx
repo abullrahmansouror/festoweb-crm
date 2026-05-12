@@ -1,39 +1,59 @@
+'use client';
+import { useEffect, useState } from 'react';
 import { FileText } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-const invoices = [
-  { number: 'INV-024', client: 'Ahmed Al-Rashid', amount: 'SAR 4,500', days: 5 },
-  { number: 'INV-023', client: 'Mohammed Salem', amount: 'SAR 3,200', days: 12 },
-  { number: 'INV-021', client: 'Sarah Johnson', amount: 'USD 2,800', days: 21 },
-  { number: 'INV-019', client: 'Khalid Al-Otaibi', amount: 'SAR 2,300', days: 34 },
-];
+import { createClient } from '@/lib/supabase/client';
 
 export function UnpaidInvoices() {
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const supabase = createClient();
+
+  useEffect(() => {
+    supabase
+      .from('invoices')
+      .select('id, invoice_number, client_name, amount, status, due_date')
+      .in('status', ['Sent', 'Overdue'])
+      .order('due_date', { ascending: true })
+      .limit(5)
+      .then(({ data }) => setInvoices(data || []));
+  }, []);
+
+  const daysOverdue = (due: string) => {
+    if (!due) return null;
+    const diff = Math.floor((Date.now() - new Date(due).getTime()) / 86400000);
+    return diff > 0 ? diff : null;
+  };
+
   return (
-    <div className="bg-surface border border-border rounded-xl p-5">
+    <div className="bg-surface border border-border rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-text-primary font-semibold">Unpaid Invoices</h3>
-        <FileText size={15} className="text-text-faint" />
+        <p className="text-text-primary font-semibold">Unpaid Invoices</p>
+        <FileText size={16} className="text-text-faint" />
       </div>
-      <div className="space-y-3">
-        {invoices.map((inv) => (
-          <div key={inv.number} className="flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-text-primary text-sm font-medium">{inv.number}</p>
-              <p className="text-text-faint text-xs truncate">{inv.client}</p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-text-primary text-sm font-medium">{inv.amount}</p>
-              <p className={cn(
-                'text-xs',
-                inv.days > 30 ? 'text-red-400' : inv.days > 14 ? 'text-warning' : 'text-text-faint'
-              )}>
-                {inv.days}d overdue
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {invoices.length === 0 ? (
+        <p className="text-text-faint text-sm text-center py-8">No unpaid invoices 🎉</p>
+      ) : (
+        <div className="space-y-3">
+          {invoices.map(inv => {
+            const overdue = daysOverdue(inv.due_date);
+            return (
+              <div key={inv.id} className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-text-primary text-sm font-medium">{inv.invoice_number || 'INV'}</p>
+                  <p className="text-text-faint text-xs truncate">{inv.client_name}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-text-primary text-sm font-semibold">SAR {(inv.amount||0).toLocaleString()}</p>
+                  {overdue ? (
+                    <p className="text-red-400 text-xs">{overdue}d overdue</p>
+                  ) : (
+                    <p className="text-blue-400 text-xs">{inv.status}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
