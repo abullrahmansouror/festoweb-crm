@@ -7,12 +7,32 @@ export type TeamRole = 'owner' | 'developer' | 'designer' | 'sales';
 
 export interface Client {
   id: string;
-  name: string;
+  name?: string;
+  full_name: string;
   company?: string;
-  email?: string;
+  company_name?: string;
+  email: string;
   phone?: string;
+  whatsapp?: string;
+  country?: string;
+  industry?: string;
+  website_url?: string;
   source?: string;
   status: 'active' | 'inactive' | 'prospect';
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  client_id?: string;
+  service_type: ServiceType;
+  status: 'pending' | 'in_progress' | 'waiting_review' | 'completed';
+  budget?: number;
+  cost?: number;
+  deadline?: string;
   notes?: string;
   created_at: string;
   updated_at?: string;
@@ -56,7 +76,7 @@ export interface TimeEntry {
   id: string;
   description: string;
   client_name?: string;
-  duration: number; // seconds
+  duration: number;
   started_at: string;
   ended_at?: string;
 }

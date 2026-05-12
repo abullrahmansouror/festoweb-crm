@@ -21,6 +21,10 @@ export function formatDuration(seconds: number): string {
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
+export function formatCurrency(amount: number, currency = 'SAR'): string {
+  return `${currency} ${amount.toLocaleString('en-SA')}`;
+}
+
 export function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
 }
