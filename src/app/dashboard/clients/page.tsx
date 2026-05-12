@@ -1,27 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Filter } from 'lucide-react';
 import { ClientCard } from '@/components/clients/client-card';
 import { ClientModal } from '@/components/clients/client-modal';
 import { cn } from '@/lib/utils';
+import { createClient } from '@/lib/supabase/client';
 import type { Client } from '@/types';
-
-const mockClients: Client[] = [
-  { id: '1', full_name: 'Ahmed Al-Rashid', company_name: 'Al-Rashid Group', email: 'ahmed@alrashid.com', phone: '+966501234567', status: 'active', created_at: '2024-01-15' },
-  { id: '2', full_name: 'Mohammed Salem', company_name: 'Salem Stores', email: 'mohammed@salem.com', phone: '+966507654321', status: 'active', created_at: '2024-02-10' },
-  { id: '3', full_name: 'Sarah Johnson', company_name: 'TechVision Ltd', email: 'sarah@techvision.com', phone: '+1234567890', status: 'active', created_at: '2024-03-05' },
-  { id: '4', full_name: 'Khalid Al-Otaibi', company_name: 'Otaibi Real Estate', email: 'khalid@otaibi.com', phone: '+966509876543', status: 'prospect', created_at: '2024-03-20' },
-];
 
 const statusFilters = ['all', 'active', 'inactive', 'prospect'];
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>(mockClients);
+  const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const supabase = createClient();
+
+  const fetchClients = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) setClients(data as Client[]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
 
   const filtered = clients.filter((c) => {
     const matchSearch =
@@ -32,17 +43,21 @@ export default function ClientsPage() {
     return matchSearch && matchStatus;
   });
 
-  const handleSave = (client: Client) => {
+  const handleSave = async (client: Client) => {
     if (editingClient) {
-      setClients((prev) => prev.map((c) => (c.id === client.id ? client : c)));
+      await supabase.from('clients').update(client).eq('id', client.id);
     } else {
-      setClients((prev) => [...prev, { ...client, id: Date.now().toString(), created_at: new Date().toISOString() }]);
+      await supabase.from('clients').insert([{ ...client, created_at: new Date().toISOString() }]);
     }
     setShowModal(false);
     setEditingClient(null);
+    fetchClients();
   };
 
-  const handleDelete = (id: string) => setClients((prev) => prev.filter((c) => c.id !== id));
+  const handleDelete = async (id: string) => {
+    await supabase.from('clients').delete().eq('id', id);
+    fetchClients();
+  };
 
   return (
     <div className="space-y-6">
@@ -87,7 +102,11 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-16">
+          <p className="text-text-muted">Loading clients...</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-text-muted">No clients found</p>
           <button onClick={() => { setEditingClient(null); setShowModal(true); }} className="mt-3 text-primary text-sm hover:underline">Add your first client</button>
