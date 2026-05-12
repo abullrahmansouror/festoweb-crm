@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, TrendingUp, TrendingDown, DollarSign, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, TrendingUp, TrendingDown, DollarSign, AlertCircle, Upload } from 'lucide-react';
 import { InvoiceModal } from '@/components/finance/invoice-modal';
 import { createClient } from '@/lib/supabase/client';
 import type { Invoice } from '@/types';
@@ -28,6 +28,9 @@ export default function FinancePage() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
 
@@ -44,7 +47,6 @@ export default function FinancePage() {
 
   useEffect(() => { fetchInvoices(); }, []);
 
-  // Use capitalized status values matching DB constraint: Draft, Sent, Paid, Overdue
   const income   = invoices.filter(i => i.type === 'income' && i.status === 'Paid').reduce((s, i) => s + (i.amount || 0), 0);
   const pending  = invoices.filter(i => i.type === 'income' && i.status === 'Sent').reduce((s, i) => s + (i.amount || 0), 0);
   const expenses = invoices.filter(i => i.type === 'expense').reduce((s, i) => s + (i.amount || 0), 0);
@@ -78,6 +80,52 @@ export default function FinancePage() {
     fetchInvoices();
   };
 
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportMsg(null);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const rows = lines.slice(1);
+      const inserts = rows.map(row => {
+        const vals = row.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const obj: any = {};
+        headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+        return {
+          invoice_number: obj.invoice_number || generateInvoiceNumber(),
+          client_name: obj.client_name || obj.client || '',
+          amount: parseFloat(obj.amount) || 0,
+          type: obj.type || 'income',
+          status: obj.status || 'Draft',
+          description: obj.description || '',
+          date: obj.date || new Date().toISOString().split('T')[0],
+          due_date: obj.due_date || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      }).filter(r => r.client_name);
+      if (inserts.length === 0) {
+        setImportMsg('❌ No valid rows found. Check your CSV format.');
+        setImporting(false);
+        return;
+      }
+      const { error: err } = await supabase.from('invoices').insert(inserts);
+      if (err) {
+        setImportMsg(`❌ Import failed: ${err.message}`);
+      } else {
+        setImportMsg(`✅ Successfully imported ${inserts.length} invoice(s)!`);
+        fetchInvoices();
+      }
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   const statusColors: Record<string, string> = {
     Paid: 'bg-accent/10 text-accent',
     Sent: 'bg-blue-400/10 text-blue-400',
@@ -92,14 +140,44 @@ export default function FinancePage() {
           <h1 className="text-2xl font-bold text-text-primary">Finance</h1>
           <p className="text-text-muted text-sm mt-1">Invoices, income & expenses</p>
         </div>
-        <button onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          <Plus size={16} /> Add Invoice
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleImportCSV}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="flex items-center gap-2 bg-surface border border-border hover:bg-surface2 text-text-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            <Upload size={16} />
+            {importing ? 'Importing...' : 'Import CSV'}
+          </button>
+          <button
+            onClick={() => { setEditingInvoice(null); setShowModal(true); }}
+            className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus size={16} /> Add Invoice
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-lg">
           ⚠️ Error: {error}
+        </div>
+      )}
+
+      {importMsg && (
+        <div className={`text-sm px-4 py-3 rounded-lg border ${
+          importMsg.startsWith('✅')
+            ? 'bg-accent/10 border-accent/30 text-accent'
+            : 'bg-red-500/10 border-red-500/30 text-red-400'
+        }`}>
+          {importMsg}
         </div>
       )}
 
