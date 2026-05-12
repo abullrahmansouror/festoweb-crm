@@ -8,10 +8,10 @@ import { cn } from '@/lib/utils';
 import type { Client } from '@/types';
 
 const mockClients: Client[] = [
-  { id: '1', full_name: 'Ahmed Al-Rashid', company_name: 'Al-Rashid Group', email: 'ahmed@alrashid.com', phone: '+966501234567', whatsapp: '+966501234567', country: 'Saudi Arabia', industry: 'Retail', website_url: 'https://alrashid.com', notes: 'VIP client', status: 'active', created_at: '2024-01-15', updated_at: '2024-01-15' },
-  { id: '2', full_name: 'Mohammed Salem', company_name: 'Salem Stores', email: 'mohammed@salem.com', phone: '+966507654321', whatsapp: '+966507654321', country: 'Saudi Arabia', industry: 'E-commerce', website_url: '', notes: '', status: 'active', created_at: '2024-02-10', updated_at: '2024-02-10' },
-  { id: '3', full_name: 'Sarah Johnson', company_name: 'TechVision Ltd', email: 'sarah@techvision.com', phone: '+1234567890', whatsapp: '', country: 'United States', industry: 'Technology', website_url: 'https://techvision.com', notes: 'Referred by Ahmed', status: 'active', created_at: '2024-03-05', updated_at: '2024-03-05' },
-  { id: '4', full_name: 'Khalid Al-Otaibi', company_name: 'Otaibi Real Estate', email: 'khalid@otaibi.com', phone: '+966509876543', whatsapp: '+966509876543', country: 'Saudi Arabia', industry: 'Real Estate', website_url: '', notes: '', status: 'prospect', created_at: '2024-03-20', updated_at: '2024-03-20' },
+  { id: '1', name: 'Ahmed Al-Rashid', company: 'Al-Rashid Group', email: 'ahmed@alrashid.com', phone: '+966501234567', status: 'active', created_at: '2024-01-15' },
+  { id: '2', name: 'Mohammed Salem', company: 'Salem Stores', email: 'mohammed@salem.com', phone: '+966507654321', status: 'active', created_at: '2024-02-10' },
+  { id: '3', name: 'Sarah Johnson', company: 'TechVision Ltd', email: 'sarah@techvision.com', phone: '+1234567890', status: 'active', created_at: '2024-03-05' },
+  { id: '4', name: 'Khalid Al-Otaibi', company: 'Otaibi Real Estate', email: 'khalid@otaibi.com', phone: '+966509876543', status: 'prospect', created_at: '2024-03-20' },
 ];
 
 const statusFilters = ['all', 'active', 'inactive', 'prospect'];
@@ -25,9 +25,9 @@ export default function ClientsPage() {
 
   const filtered = clients.filter((c) => {
     const matchSearch =
-      c.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.company_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase());
+      (c.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.company ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.email ?? '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -36,19 +36,16 @@ export default function ClientsPage() {
     if (editingClient) {
       setClients((prev) => prev.map((c) => (c.id === client.id ? client : c)));
     } else {
-      setClients((prev) => [...prev, { ...client, id: Date.now().toString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+      setClients((prev) => [...prev, { ...client, id: Date.now().toString(), created_at: new Date().toISOString() }]);
     }
     setShowModal(false);
     setEditingClient(null);
   };
 
-  const handleDelete = (id: string) => {
-    setClients((prev) => prev.filter((c) => c.id !== id));
-  };
+  const handleDelete = (id: string) => setClients((prev) => prev.filter((c) => c.id !== id));
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Clients</h1>
@@ -58,12 +55,10 @@ export default function ClientsPage() {
           onClick={() => { setEditingClient(null); setShowModal(true); }}
           className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
-          <Plus size={16} />
-          Add Client
+          <Plus size={16} /> Add Client
         </button>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2 flex-1">
           <Search size={15} className="text-text-faint" />
@@ -75,7 +70,7 @@ export default function ClientsPage() {
             className="bg-transparent text-sm text-text-primary placeholder-text-faint focus:outline-none w-full"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Filter size={15} className="text-text-faint" />
           {statusFilters.map((s) => (
             <button
@@ -83,9 +78,7 @@ export default function ClientsPage() {
               onClick={() => setStatusFilter(s)}
               className={cn(
                 'px-3 py-2 rounded-lg text-xs font-medium capitalize transition-colors',
-                statusFilter === s
-                  ? 'bg-primary text-white'
-                  : 'bg-surface border border-border text-text-muted hover:text-text-primary'
+                statusFilter === s ? 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:text-text-primary'
               )}
             >
               {s}
@@ -94,7 +87,6 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Client Grid */}
       {filtered.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-text-muted">No clients found</p>
@@ -113,7 +105,6 @@ export default function ClientsPage() {
         </div>
       )}
 
-      {/* Modal */}
       {showModal && (
         <ClientModal
           client={editingClient}

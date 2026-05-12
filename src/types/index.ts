@@ -7,10 +7,8 @@ export type TeamRole = 'owner' | 'developer' | 'designer' | 'sales';
 
 export interface Client {
   id: string;
-  name?: string;
-  full_name: string;
+  name: string;
   company?: string;
-  company_name?: string;
   email: string;
   phone?: string;
   whatsapp?: string;
