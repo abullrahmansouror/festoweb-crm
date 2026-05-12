@@ -4,171 +4,232 @@ import autoTable from 'jspdf-autotable';
 export function generateInvoicePDF(invoice: any) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210;
-  const black: [number,number,number] = [10, 10, 10];
-  const gray: [number,number,number] = [120, 120, 120];
-  const light: [number,number,number] = [220, 220, 220];
+  const margin = 15;
 
-  // ── HEADER ─────────────────────────────────────────────
-  // Big INVOICE title
+  // ── COLORS ─────────────────────────────────────────────
+  const teal:  [number,number,number] = [13, 148, 136];   // #0d9488
+  const black: [number,number,number] = [15, 15, 15];
+  const dark:  [number,number,number] = [50, 50, 50];
+  const muted: [number,number,number] = [120, 120, 120];
+  const light: [number,number,number] = [230, 230, 230];
+  const white: [number,number,number] = [255, 255, 255];
+
+  // ── TOP HEADER BAR ─────────────────────────────────────
+  doc.setFillColor(...teal);
+  doc.rect(0, 0, W, 28, 'F');
+
+  // Brand name — left
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(36);
-  doc.setTextColor(...black);
-  doc.text('INVOICE', 15, 22);
+  doc.setFontSize(22);
+  doc.setTextColor(...white);
+  doc.text('Festoweb', margin, 18);
 
-  // Invoice number below title
+  // Contact info — right side of header
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...white);
+  doc.text('+966 506 724 880', W - margin, 12, { align: 'right' });
+  doc.text('contact@festoweb.com', W - margin, 19, { align: 'right' });
+
+  // ── INVOICE LABEL + NUMBER ─────────────────────────────
+  let y = 44;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(20);
   doc.setTextColor(...black);
-  doc.text(`INVOICE NO.${invoice.invoice_number}`, 15, 30);
+  doc.text('INVOICE', margin, y);
 
-  // Festoweb logo (text-based) top-right
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...muted);
+  doc.text(`# ${invoice.invoice_number || ''}`, margin, y + 7);
+
+  // ── DATE — right side ──────────────────────────────────
+  const issuedDate = invoice.created_at
+    ? new Date(invoice.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+    : invoice.date
+    ? new Date(invoice.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+    : '-';
+  const dueDate = invoice.due_date
+    ? new Date(invoice.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+    : null;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...muted);
+  doc.text('Date', W - margin, y, { align: 'right' });
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(...black);
-  doc.text('festoweb', W - 15, 20, { align: 'right' });
-  // Lightning bolt symbol before logo
-  doc.setFontSize(18);
-  doc.setTextColor(80, 80, 230);
-  doc.text('\u26A1', W - 15 - doc.getTextWidth('festoweb') - 3, 21, { align: 'right' });
+  doc.setTextColor(...dark);
+  doc.text(issuedDate, W - margin, y + 7, { align: 'right' });
 
-  // Divider line
+  if (dueDate) {
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...muted);
+    doc.text('Due Date', W - margin, y + 14, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...dark);
+    doc.text(dueDate, W - margin, y + 21, { align: 'right' });
+  }
+
+  // ── DIVIDER ────────────────────────────────────────────
+  y += 18;
   doc.setDrawColor(...light);
   doc.setLineWidth(0.4);
-  doc.line(15, 35, W - 15, 35);
+  doc.line(margin, y, W - margin, y);
 
-  // ── ISSUED TO & DATES ──────────────────────────────────
-  const colLeft = 15;
-  const colRight = 120;
-
+  // ── BILL TO ────────────────────────────────────────────
+  y += 10;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...black);
-  doc.text('ISSUED TO :', colLeft, 45);
-
-  doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.setTextColor(50, 50, 50);
-  const clientName = invoice.clients?.full_name || '-';
-  const clientCompany = invoice.clients?.company_name || '';
-  const clientEmail = invoice.clients?.email || '';
-  const clientPhone = invoice.clients?.phone || '';
-  let cy = 52;
-  doc.text(clientName, colLeft, cy); cy += 6;
-  if (clientCompany) { doc.text(clientCompany, colLeft, cy); cy += 6; }
-  if (clientPhone)   { doc.text(clientPhone, colLeft, cy);   cy += 6; }
-  if (clientEmail)   { doc.text(clientEmail, colLeft, cy);   cy += 6; }
+  doc.setTextColor(...teal);
+  doc.text('BILL TO', margin, y);
 
-  // Dates right side
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(80, 80, 80);
-  const issuedDate = invoice.created_at ? new Date(invoice.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' }) : '-';
-  const dueDate    = invoice.due_date   ? new Date(invoice.due_date).toLocaleDateString('en-GB',   { day:'numeric', month:'long', year:'numeric' }) : '-';
-
-  doc.text('Issued Date', colRight, 45);
-  doc.text(':', colRight + 28, 45);
-  doc.text(issuedDate, colRight + 32, 45);
-  doc.text('Due Date', colRight, 52);
-  doc.text(':', colRight + 28, 52);
-  doc.text(dueDate, colRight + 32, 52);
-
-  // ── ITEMS TABLE ────────────────────────────────────────
-  const items = invoice.invoice_items || [];
-  const currency = invoice.currency || 'SAR';
-
-  autoTable(doc, {
-    startY: 78,
-    head: [['DESCRIPTION', 'QTY', 'PRICE', 'TOTAL']],
-    body: items.map((item: any) => [
-      item.description || '-',
-      item.quantity ?? 1,
-      `${currency} ${Number(item.unit_price).toLocaleString()}`,
-      `${currency} ${Number(item.total ?? (item.unit_price * item.quantity)).toLocaleString()}`,
-    ]),
-    headStyles: {
-      fillColor: [255, 255, 255],
-      textColor: black,
-      fontStyle: 'bold',
-      fontSize: 9,
-      lineWidth: { bottom: 0.5 },
-      lineColor: black,
-    },
-    bodyStyles: {
-      fontSize: 9,
-      textColor: [50, 50, 50],
-      lineWidth: 0,
-    },
-    alternateRowStyles: { fillColor: [255, 255, 255] },
-    columnStyles: {
-      0: { cellWidth: 90 },
-      1: { cellWidth: 20, halign: 'center' },
-      2: { cellWidth: 35, halign: 'right' },
-      3: { cellWidth: 35, halign: 'right' },
-    },
-    margin: { left: 15, right: 15 },
-    tableLineWidth: 0,
-  });
-
-  const finalY = (doc as any).lastAutoTable.finalY + 5;
-
-  // Divider above totals
-  doc.setDrawColor(...light);
-  doc.line(110, finalY, W - 15, finalY);
-
-  // ── TOTALS ─────────────────────────────────────────────
-  const subtotal   = Number(invoice.subtotal  || 0);
-  const taxAmount  = Number(invoice.tax_amount || (subtotal * (invoice.tax_rate || 0) / 100));
-  const total      = Number(invoice.total     || subtotal + taxAmount);
-
-  const totY = finalY + 8;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(80, 80, 80);
-
-  doc.text('Subtotal', 130, totY);
-  doc.text(`${currency} ${subtotal.toLocaleString()}`, W - 15, totY, { align: 'right' });
-
-  doc.line(110, totY + 3, W - 15, totY + 3);
-
-  doc.text('Tax', 130, totY + 10);
-  doc.text(`${currency} ${taxAmount.toLocaleString()}`, W - 15, totY + 10, { align: 'right' });
-
-  doc.line(110, totY + 13, W - 15, totY + 13);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...black);
-  doc.text('Total', 130, totY + 20);
-  doc.text(`${currency} ${total.toLocaleString()}`, W - 15, totY + 20, { align: 'right' });
-
-  doc.line(110, totY + 23, W - 15, totY + 23);
-
-  // ── PAYMENT TO ─────────────────────────────────────────
-  const payY = totY + 35;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...black);
-  doc.text('PAYMENT TO :', colLeft, payY);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(50, 50, 50);
-  doc.text('FestoWeb', colLeft, payY + 7);
-  if (invoice.bank_account_number) {
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Account No.   :   ${invoice.bank_account_number}`, colLeft, payY + 14);
-  }
-  if (invoice.bank_account_name) {
-    doc.text(`Account Name  :   ${invoice.bank_account_name}`, colLeft, payY + 21);
-  }
-
-  // ── THANK YOU ─────────────────────────────────────────
-  const thankY = payY + 14;
+  y += 6;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...black);
-  doc.text('THANK YOU FOR', W - 15, thankY, { align: 'right' });
-  doc.text('ORDERING FROM US', W - 15, thankY + 8, { align: 'right' });
+  const clientName = invoice.clients?.full_name || invoice.client_name || '-';
+  doc.text(clientName, margin, y);
 
-  doc.save(`FestoWeb-Invoice-${invoice.invoice_number}.pdf`);
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...dark);
+
+  const clientCompany = invoice.clients?.company_name || '';
+  const clientPhone   = invoice.clients?.phone || '';
+  const clientEmail   = invoice.clients?.email || '';
+  const clientAddress = invoice.clients?.address || '';
+
+  if (clientCompany) { doc.text(clientCompany, margin, y); y += 5; }
+  if (clientPhone)   { doc.text(clientPhone,   margin, y); y += 5; }
+  if (clientEmail)   { doc.text(clientEmail,   margin, y); y += 5; }
+  if (clientAddress) { doc.text(clientAddress, margin, y); y += 5; }
+
+  // ── ITEMS TABLE ────────────────────────────────────────
+  const tableStartY = y + 8;
+  const items = invoice.invoice_items || [];
+  const currency = invoice.currency || 'SAR';
+
+  // Build body — if no items, use description + amount as single row
+  const tableBody = items.length > 0
+    ? items.map((item: any) => [
+        item.description || '-',
+        String(item.quantity ?? 1),
+        `${currency} ${Number(item.unit_price || 0).toLocaleString()}`,
+        `${currency} ${Number(item.total ?? (item.unit_price * item.quantity) || 0).toLocaleString()}`,
+      ])
+    : [[
+        invoice.description || 'Service',
+        '1',
+        `${currency} ${Number(invoice.amount || 0).toLocaleString()}`,
+        `${currency} ${Number(invoice.amount || 0).toLocaleString()}`,
+      ]];
+
+  autoTable(doc, {
+    startY: tableStartY,
+    head: [['Service / Description', 'Qty', 'Unit Price', 'Total']],
+    body: tableBody,
+    headStyles: {
+      fillColor: teal,
+      textColor: white,
+      fontStyle: 'bold',
+      fontSize: 9,
+      cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
+    },
+    bodyStyles: {
+      fontSize: 9,
+      textColor: dark,
+      cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 90 },
+      1: { cellWidth: 20, halign: 'center' },
+      2: { cellWidth: 38, halign: 'right' },
+      3: { cellWidth: 38, halign: 'right', fontStyle: 'bold' },
+    },
+    margin: { left: margin, right: margin },
+    tableLineWidth: 0,
+  });
+
+  let finalY = (doc as any).lastAutoTable.finalY;
+
+  // ── TOTALS ─────────────────────────────────────────────
+  const subtotal  = Number(invoice.subtotal  || invoice.amount || 0);
+  const taxRate   = Number(invoice.tax_rate  || 0);
+  const taxAmount = Number(invoice.tax_amount || (subtotal * taxRate / 100));
+  const total     = Number(invoice.total     || subtotal + taxAmount);
+
+  const totalsX = W - margin - 80;
+  let ty = finalY + 8;
+
+  // Subtotal row
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...muted);
+  doc.text('Subtotal', totalsX, ty);
+  doc.setTextColor(...dark);
+  doc.text(`${currency} ${subtotal.toLocaleString()}`, W - margin, ty, { align: 'right' });
+
+  ty += 6;
+  doc.setTextColor(...muted);
+  doc.text(`Tax (${taxRate}%)`, totalsX, ty);
+  doc.setTextColor(...dark);
+  doc.text(`${currency} ${taxAmount.toLocaleString()}`, W - margin, ty, { align: 'right' });
+
+  ty += 4;
+  doc.setDrawColor(...light);
+  doc.line(totalsX, ty, W - margin, ty);
+
+  ty += 6;
+  // Total box
+  doc.setFillColor(...teal);
+  doc.roundedRect(totalsX - 2, ty - 5, W - margin - totalsX + 4, 10, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...white);
+  doc.text('Total', totalsX + 2, ty + 1.5);
+  doc.text(`${currency} ${total.toLocaleString()}`, W - margin - 2, ty + 1.5, { align: 'right' });
+
+  // ── NOTE ───────────────────────────────────────────────
+  const noteText = invoice.notes || invoice.note || '';
+  let bottomY = ty + 20;
+
+  if (noteText) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...teal);
+    doc.text('NOTE', margin, bottomY);
+    bottomY += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...dark);
+    const lines = doc.splitTextToSize(noteText, W - margin * 2 - 85);
+    doc.text(lines, margin, bottomY);
+    bottomY += lines.length * 5 + 5;
+  }
+
+  // ── DIVIDER BEFORE FOOTER ──────────────────────────────
+  const footerDivY = 270;
+  doc.setDrawColor(...light);
+  doc.setLineWidth(0.4);
+  doc.line(margin, footerDivY, W - margin, footerDivY);
+
+  // ── THANK YOU MESSAGE ──────────────────────────────────
+  const thankMsg = invoice.thank_you_message || 'Thank you for your business! We look forward to working with you again.';
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(9);
+  doc.setTextColor(...muted);
+  const thankLines = doc.splitTextToSize(thankMsg, W - margin * 2);
+  doc.text(thankLines, W / 2, 276, { align: 'center' });
+
+  // ── FOOTER ─────────────────────────────────────────────
+  doc.setFillColor(...teal);
+  doc.rect(0, 285, W, 12, 'F');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...white);
+  doc.text('Festoweb  ·  +966 506 724 880  ·  contact@festoweb.com', W / 2, 292, { align: 'center' });
+
+  doc.save(`FestoWeb-Invoice-${invoice.invoice_number || 'draft'}.pdf`);
 }
