@@ -7,14 +7,15 @@ import { PipelineCardModal } from '@/components/pipeline/pipeline-card-modal';
 import { createClient } from '@/lib/supabase/client';
 import type { PipelineCard, PipelineStage } from '@/types';
 
-const STAGES: { id: PipelineStage; label: string; color: string }[] = [
-  { id: 'lead', label: 'Lead', color: 'border-t-purple-400' },
-  { id: 'discovery_call', label: 'Discovery Call', color: 'border-t-blue-400' },
-  { id: 'deal_in_meeting', label: 'Deal in Meeting', color: 'border-t-yellow-400' },
-  { id: 'paid_deposit', label: 'Paid Deposit 50%', color: 'border-t-orange-400' },
-  { id: 'in_progress', label: 'In Progress', color: 'border-t-primary' },
-  { id: 'review', label: 'Review', color: 'border-t-cyan-400' },
-  { id: 'completed_paid', label: 'Completed Paid', color: 'border-t-accent' },
+// Stage IDs must match DB check constraint EXACTLY
+const STAGES: { id: string; label: string; color: string }[] = [
+  { id: 'Lead', label: 'Lead', color: 'border-t-purple-400' },
+  { id: 'Discovery Call', label: 'Discovery Call', color: 'border-t-blue-400' },
+  { id: 'Deal in Meeting', label: 'Deal in Meeting', color: 'border-t-yellow-400' },
+  { id: 'Paid Deposit 50%', label: 'Paid Deposit 50%', color: 'border-t-orange-400' },
+  { id: 'In Progress', label: 'In Progress', color: 'border-t-primary' },
+  { id: 'Review', label: 'Review', color: 'border-t-cyan-400' },
+  { id: 'Completed Paid 50%', label: 'Completed Paid 50%', color: 'border-t-accent' },
 ];
 
 export default function PipelinePage() {
@@ -55,7 +56,7 @@ export default function PipelinePage() {
 
   const handleDragStart = (id: string) => setDraggingId(id);
 
-  const handleDrop = async (stage: PipelineStage) => {
+  const handleDrop = async (stage: string) => {
     if (!draggingId) return;
     await supabase.from('pipeline_leads').update({ stage, updated_at: new Date().toISOString() }).eq('id', draggingId);
     setDraggingId(null);
@@ -80,6 +81,7 @@ export default function PipelinePage() {
       const { error: err } = await supabase.from('pipeline_leads').insert([{ ...payload, created_at: new Date().toISOString() }]);
       if (err) { setError(err.message); return; }
     }
+    setError(null);
     setShowModal(false);
     setEditingCard(null);
     fetchCards();
@@ -118,10 +120,10 @@ export default function PipelinePage() {
           {STAGES.map((stage) => (
             <PipelineColumn
               key={stage.id}
-              stage={stage}
+              stage={stage as any}
               cards={cards.filter((c) => c.stage === stage.id)}
               onDragStart={handleDragStart}
-              onDrop={handleDrop}
+              onDrop={handleDrop as any}
               onEdit={(card) => { setEditingCard(card); setShowModal(true); }}
               onDelete={handleDelete}
             />
@@ -132,6 +134,7 @@ export default function PipelinePage() {
       {showModal && (
         <PipelineCardModal
           card={editingCard}
+          stages={STAGES.map(s => s.id)}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditingCard(null); }}
         />
