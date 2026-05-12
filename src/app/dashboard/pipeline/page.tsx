@@ -89,7 +89,6 @@ export default function PipelinePage() {
 
   const handleSave = async (card: PipelineCard & { client_email?: string }) => {
     const prevStage = editingCard?.stage;
-    const isNew = !editingCard;
     const stageChanged = editingCard && prevStage !== card.stage;
 
     const payload = {
@@ -107,14 +106,12 @@ export default function PipelinePage() {
     if (editingCard) {
       const { error: err } = await supabase.from('pipeline_leads').update(payload).eq('id', card.id);
       if (err) { setError(err.message); return; }
-      // Send email whenever stage changes
       if (stageChanged) await sendStageEmail(card as any);
     } else {
       const { error: err } = await supabase
         .from('pipeline_leads')
         .insert([{ ...payload, created_at: new Date().toISOString() }]);
       if (err) { setError(err.message); return; }
-      // Send welcome email for new deals that have an email
       await sendStageEmail(card as any);
     }
 
@@ -164,7 +161,7 @@ export default function PipelinePage() {
               onEdit={(card) => { setEditingCard(card); setShowModal(true); }}
               onDelete={handleDelete}
             />
-          )}
+          ))}
         </div>
       )}
 
