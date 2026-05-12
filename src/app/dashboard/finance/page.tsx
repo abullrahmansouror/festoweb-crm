@@ -16,6 +16,14 @@ const KPI = ({ icon: Icon, label, value, color }: { icon: any; label: string; va
   </div>
 );
 
+// Auto-generate invoice number like INV-20260512-001
+const generateInvoiceNumber = () => {
+  const date = new Date();
+  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+  const rand = Math.floor(Math.random() * 900) + 100;
+  return `INV-${dateStr}-${rand}`;
+};
+
 export default function FinancePage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -58,9 +66,15 @@ export default function FinancePage() {
       const { error: err } = await supabase.from('invoices').update(payload).eq('id', inv.id);
       if (err) { setError(err.message); return; }
     } else {
-      const { error: err } = await supabase.from('invoices').insert([{ ...payload, created_at: new Date().toISOString() }]);
+      // invoice_number is NOT NULL — generate one automatically
+      const { error: err } = await supabase.from('invoices').insert([{
+        ...payload,
+        invoice_number: generateInvoiceNumber(),
+        created_at: new Date().toISOString(),
+      }]);
       if (err) { setError(err.message); return; }
     }
+    setError(null);
     setShowModal(false);
     setEditingInvoice(null);
     fetchInvoices();
@@ -113,7 +127,7 @@ export default function FinancePage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {['Client / Description', 'Type', 'Amount', 'Status', 'Date', 'Due Date', ''].map(h => (
+                  {['#', 'Client / Description', 'Type', 'Amount', 'Status', 'Date', 'Due Date', ''].map(h => (
                     <th key={h} className="text-left text-text-faint text-xs font-medium px-4 py-3">{h}</th>
                   ))}
                 </tr>
@@ -121,9 +135,11 @@ export default function FinancePage() {
               <tbody>
                 {invoices.map(inv => (
                   <tr key={inv.id} className="border-b border-border/50 hover:bg-surface2 transition-colors">
+                    <td className="px-4 py-3 text-text-faint text-xs tabular-nums">{(inv as any).invoice_number}</td>
                     <td className="px-4 py-3">
                       <p className="text-text-primary text-sm font-medium">{inv.client_name}</p>
                       <p className="text-text-faint text-xs">{inv.description}</p>
+
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-1 rounded-full ${inv.type === 'income' ? 'bg-accent/10 text-accent' : 'bg-red-400/10 text-red-400'}`}>{inv.type}</span>
