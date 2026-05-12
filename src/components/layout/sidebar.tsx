@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, GitBranch, DollarSign, BarChart2, Settings, Zap } from 'lucide-react';
+import { LayoutDashboard, Users, GitBranch, DollarSign, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -19,11 +20,15 @@ export function Sidebar() {
   return (
     <aside className="w-56 bg-surface border-r border-border h-screen flex flex-col sticky top-0">
       {/* Logo */}
-      <div className="p-5 border-b border-border">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
-            <Zap size={14} className="text-white" fill="white" />
-          </div>
+      <div className="px-5 py-4 border-b border-border">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/festoweb-icon.svg"
+            alt="Festoweb Logo"
+            width={32}
+            height={32}
+            className="rounded-lg shrink-0"
+          />
           <div>
             <p className="text-text-primary font-bold text-sm leading-none">Festoweb</p>
             <p className="text-text-faint text-xs mt-0.5">CRM</p>
