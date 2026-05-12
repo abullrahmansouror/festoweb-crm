@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { PipelineColumn } from '@/components/pipeline/pipeline-column';
 import { PipelineCardModal } from '@/components/pipeline/pipeline-card-modal';
+import { createClient } from '@/lib/supabase/client';
 import type { PipelineCard, PipelineStage } from '@/types';
 
 const STAGES: { id: PipelineStage; label: string; color: string }[] = [
@@ -16,44 +17,81 @@ const STAGES: { id: PipelineStage; label: string; color: string }[] = [
   { id: 'completed_paid', label: 'Completed Paid', color: 'border-t-accent' },
 ];
 
-const initialCards: PipelineCard[] = [
-  { id: '1', client_name: 'Faisal Al-Dosari', company_name: 'Dosari Pharma', service_type: 'website_design', value: 8000, stage: 'lead', notes: 'Interested in full website redesign', next_follow_up: '2024-04-10T10:00:00Z', created_at: '2024-04-01', updated_at: '2024-04-01' },
-  { id: '2', client_name: 'Nora Al-Qahtani', company_name: 'Nora Fashion', service_type: 'ecommerce', value: 15000, stage: 'discovery_call', notes: 'Wants full e-commerce store', next_follow_up: '2024-04-08T14:00:00Z', created_at: '2024-04-02', updated_at: '2024-04-02' },
-  { id: '3', client_name: 'Omar Bakr', company_name: 'Bakr Consulting', service_type: 'landing_page', value: 3500, stage: 'deal_in_meeting', notes: 'High-converting landing page for ads', created_at: '2024-04-03', updated_at: '2024-04-03' },
-  { id: '4', client_name: 'Layla Hassan', company_name: 'Hassan Corp', service_type: 'website_redesign', value: 6000, stage: 'paid_deposit', notes: 'Deposit received, starting design phase', created_at: '2024-04-04', updated_at: '2024-04-04' },
-];
-
 export default function PipelinePage() {
-  const [cards, setCards] = useState<PipelineCard[]>(initialCards);
+  const [cards, setCards] = useState<PipelineCard[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingCard, setEditingCard] = useState<PipelineCard | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const supabase = createClient();
+
+  const fetchCards = async () => {
+    setLoading(true);
+    const { data, error: err } = await supabase
+      .from('pipeline_leads')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (err) setError(err.message);
+    else if (data) setCards(data.map((d: any) => ({
+      id: d.id,
+      client_name: d.client_name,
+      company_name: d.company,
+      service_type: d.service,
+      value: d.value,
+      stage: d.stage,
+      notes: d.notes,
+      next_follow_up: d.follow_up_date,
+      created_at: d.created_at,
+      updated_at: d.updated_at,
+    })) as PipelineCard[]);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchCards(); }, []);
 
   const totalValue = cards.reduce((sum, c) => sum + (c.value || 0), 0);
 
   const handleDragStart = (id: string) => setDraggingId(id);
 
-  const handleDrop = (stage: PipelineStage) => {
+  const handleDrop = async (stage: PipelineStage) => {
     if (!draggingId) return;
-    setCards((prev) => prev.map((c) => c.id === draggingId ? { ...c, stage, updated_at: new Date().toISOString() } : c));
+    await supabase.from('pipeline_leads').update({ stage, updated_at: new Date().toISOString() }).eq('id', draggingId);
     setDraggingId(null);
+    fetchCards();
   };
 
-  const handleSave = (card: PipelineCard) => {
+  const handleSave = async (card: PipelineCard) => {
+    const payload = {
+      client_name: card.client_name,
+      company: card.company_name,
+      service: card.service_type,
+      value: card.value,
+      stage: card.stage,
+      notes: card.notes,
+      follow_up_date: card.next_follow_up || null,
+      updated_at: new Date().toISOString(),
+    };
     if (editingCard) {
-      setCards((prev) => prev.map((c) => c.id === card.id ? card : c));
+      const { error: err } = await supabase.from('pipeline_leads').update(payload).eq('id', card.id);
+      if (err) { setError(err.message); return; }
     } else {
-      setCards((prev) => [...prev, { ...card, id: Date.now().toString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+      const { error: err } = await supabase.from('pipeline_leads').insert([{ ...payload, created_at: new Date().toISOString() }]);
+      if (err) { setError(err.message); return; }
     }
     setShowModal(false);
     setEditingCard(null);
+    fetchCards();
   };
 
-  const handleDelete = (id: string) => setCards((prev) => prev.filter((c) => c.id !== id));
+  const handleDelete = async (id: string) => {
+    await supabase.from('pipeline_leads').delete().eq('id', id);
+    fetchCards();
+  };
 
   return (
     <div className="space-y-5 h-full flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Sales Pipeline</h1>
@@ -67,20 +105,29 @@ export default function PipelinePage() {
         </button>
       </div>
 
-      {/* Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4 flex-1">
-        {STAGES.map((stage) => (
-          <PipelineColumn
-            key={stage.id}
-            stage={stage}
-            cards={cards.filter((c) => c.stage === stage.id)}
-            onDragStart={handleDragStart}
-            onDrop={handleDrop}
-            onEdit={(card) => { setEditingCard(card); setShowModal(true); }}
-            onDelete={handleDelete}
-          />
-        ))}
-      </div>
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-lg">
+          ⚠️ Error: {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-16"><p className="text-text-muted">Loading pipeline...</p></div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-4 flex-1">
+          {STAGES.map((stage) => (
+            <PipelineColumn
+              key={stage.id}
+              stage={stage}
+              cards={cards.filter((c) => c.stage === stage.id)}
+              onDragStart={handleDragStart}
+              onDrop={handleDrop}
+              onEdit={(card) => { setEditingCard(card); setShowModal(true); }}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
 
       {showModal && (
         <PipelineCardModal

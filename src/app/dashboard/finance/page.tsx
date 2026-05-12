@@ -1,16 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, TrendingUp, TrendingDown, DollarSign, AlertCircle } from 'lucide-react';
 import { InvoiceModal } from '@/components/finance/invoice-modal';
+import { createClient } from '@/lib/supabase/client';
 import type { Invoice } from '@/types';
-
-const initialInvoices: Invoice[] = [
-  { id: '1', client_name: 'Faisal Al-Dosari', amount: 8000, type: 'income', status: 'paid', description: 'Website Design Project', date: '2024-04-01', due_date: '2024-04-15' },
-  { id: '2', client_name: 'Nora Fashion', amount: 7500, type: 'income', status: 'pending', description: 'E-commerce deposit 50%', date: '2024-04-05', due_date: '2024-04-20' },
-  { id: '3', client_name: 'STC Tools', amount: 2400, type: 'expense', status: 'paid', description: 'Adobe CC + Figma annual', date: '2024-04-02' },
-  { id: '4', client_name: 'Omar Bakr', amount: 3500, type: 'income', status: 'overdue', description: 'Landing Page - Overdue', date: '2024-03-15', due_date: '2024-03-30' },
-];
 
 const KPI = ({ icon: Icon, label, value, color }: { icon: any; label: string; value: string; color: string }) => (
   <div className="bg-surface border border-border rounded-xl p-4">
@@ -23,23 +17,53 @@ const KPI = ({ icon: Icon, label, value, color }: { icon: any; label: string; va
 );
 
 export default function FinancePage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const income = invoices.filter(i => i.type === 'income' && i.status === 'paid').reduce((s, i) => s + i.amount, 0);
-  const pending = invoices.filter(i => i.type === 'income' && i.status === 'pending').reduce((s, i) => s + i.amount, 0);
-  const expenses = invoices.filter(i => i.type === 'expense').reduce((s, i) => s + i.amount, 0);
+  const supabase = createClient();
+
+  const fetchInvoices = async () => {
+    setLoading(true);
+    const { data, error: err } = await supabase
+      .from('invoices')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (err) setError(err.message);
+    else if (data) setInvoices(data as Invoice[]);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchInvoices(); }, []);
+
+  const income = invoices.filter(i => i.type === 'income' && i.status === 'paid').reduce((s, i) => s + (i.amount || 0), 0);
+  const pending = invoices.filter(i => i.type === 'income' && i.status === 'pending').reduce((s, i) => s + (i.amount || 0), 0);
+  const expenses = invoices.filter(i => i.type === 'expense').reduce((s, i) => s + (i.amount || 0), 0);
   const overdue = invoices.filter(i => i.status === 'overdue').length;
 
-  const handleSave = (inv: Invoice) => {
+  const handleSave = async (inv: Invoice) => {
+    const payload = {
+      client_name: inv.client_name,
+      amount: inv.amount,
+      type: inv.type,
+      status: inv.status,
+      description: inv.description,
+      date: inv.date || new Date().toISOString().split('T')[0],
+      due_date: inv.due_date || null,
+      updated_at: new Date().toISOString(),
+    };
     if (editingInvoice) {
-      setInvoices(prev => prev.map(i => i.id === inv.id ? inv : i));
+      const { error: err } = await supabase.from('invoices').update(payload).eq('id', inv.id);
+      if (err) { setError(err.message); return; }
     } else {
-      setInvoices(prev => [...prev, { ...inv, id: Date.now().toString() }]);
+      const { error: err } = await supabase.from('invoices').insert([{ ...payload, created_at: new Date().toISOString() }]);
+      if (err) { setError(err.message); return; }
     }
     setShowModal(false);
     setEditingInvoice(null);
+    fetchInvoices();
   };
 
   const statusColors: Record<string, string> = {
@@ -60,6 +84,12 @@ export default function FinancePage() {
         </button>
       </div>
 
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-lg">
+          ⚠️ Error: {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPI icon={TrendingUp} label="Income Received" value={`SAR ${income.toLocaleString()}`} color="bg-accent/10 text-accent" />
         <KPI icon={DollarSign} label="Pending" value={`SAR ${pending.toLocaleString()}`} color="bg-yellow-400/10 text-yellow-400" />
@@ -71,37 +101,46 @@ export default function FinancePage() {
         <div className="p-4 border-b border-border">
           <p className="text-text-primary font-semibold">All Transactions</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                {['Client / Description', 'Type', 'Amount', 'Status', 'Date', 'Due Date', ''].map(h => (
-                  <th key={h} className="text-left text-text-faint text-xs font-medium px-4 py-3">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map(inv => (
-                <tr key={inv.id} className="border-b border-border/50 hover:bg-surface2 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="text-text-primary text-sm font-medium">{inv.client_name}</p>
-                    <p className="text-text-faint text-xs">{inv.description}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded-full ${inv.type === 'income' ? 'bg-accent/10 text-accent' : 'bg-red-400/10 text-red-400'}`}>{inv.type}</span>
-                  </td>
-                  <td className="px-4 py-3 text-text-primary text-sm font-semibold tabular-nums">SAR {inv.amount.toLocaleString()}</td>
-                  <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusColors[inv.status]}`}>{inv.status}</span></td>
-                  <td className="px-4 py-3 text-text-muted text-sm">{inv.date}</td>
-                  <td className="px-4 py-3 text-text-muted text-sm">{inv.due_date || '—'}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => { setEditingInvoice(inv); setShowModal(true); }} className="text-text-faint hover:text-primary text-xs transition-colors">Edit</button>
-                  </td>
+        {loading ? (
+          <div className="text-center py-12"><p className="text-text-muted text-sm">Loading...</p></div>
+        ) : invoices.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-text-muted text-sm">No transactions yet</p>
+            <button onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="mt-2 text-primary text-sm hover:underline">Add your first invoice</button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  {['Client / Description', 'Type', 'Amount', 'Status', 'Date', 'Due Date', ''].map(h => (
+                    <th key={h} className="text-left text-text-faint text-xs font-medium px-4 py-3">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {invoices.map(inv => (
+                  <tr key={inv.id} className="border-b border-border/50 hover:bg-surface2 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="text-text-primary text-sm font-medium">{inv.client_name}</p>
+                      <p className="text-text-faint text-xs">{inv.description}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded-full ${inv.type === 'income' ? 'bg-accent/10 text-accent' : 'bg-red-400/10 text-red-400'}`}>{inv.type}</span>
+                    </td>
+                    <td className="px-4 py-3 text-text-primary text-sm font-semibold tabular-nums">SAR {(inv.amount || 0).toLocaleString()}</td>
+                    <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusColors[inv.status] || ''}`}>{inv.status}</span></td>
+                    <td className="px-4 py-3 text-text-muted text-sm">{inv.date}</td>
+                    <td className="px-4 py-3 text-text-muted text-sm">{inv.due_date || '—'}</td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => { setEditingInvoice(inv); setShowModal(true); }} className="text-text-faint hover:text-primary text-xs transition-colors">Edit</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {showModal && <InvoiceModal invoice={editingInvoice} onSave={handleSave} onClose={() => { setShowModal(false); setEditingInvoice(null); }} />}
