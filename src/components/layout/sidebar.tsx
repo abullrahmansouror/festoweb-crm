@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, GitBranch, DollarSign, CheckSquare, Clock, UserCheck, BarChart2, Settings, Zap } from 'lucide-react';
+import { LayoutDashboard, Users, GitBranch, DollarSign, Clock, UserCheck, BarChart2, Settings, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -10,7 +10,6 @@ const NAV_ITEMS = [
   { href: '/dashboard/clients', icon: Users, label: 'Clients' },
   { href: '/dashboard/pipeline', icon: GitBranch, label: 'Pipeline' },
   { href: '/dashboard/finance', icon: DollarSign, label: 'Finance' },
-  { href: '/dashboard/tasks', icon: CheckSquare, label: 'Tasks' },
   { href: '/dashboard/time-tracker', icon: Clock, label: 'Time Tracker' },
   { href: '/dashboard/team', icon: UserCheck, label: 'Team' },
   { href: '/dashboard/reports', icon: BarChart2, label: 'Reports' },
