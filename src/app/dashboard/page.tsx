@@ -33,7 +33,6 @@ export default function DashboardPage() {
         supabase.from('invoices').select('id,invoice_number,status,total,amount,currency,due_date,date,created_at,client_id,type'),
         supabase.from('expenses').select('id,amount,currency,date,category'),
         supabase.from('projects').select('id,title,status,deadline,client_id'),
-        // fixed: use full_name and company_name — actual column names in DB
         supabase.from('clients').select('id,full_name,company_name,created_at').order('created_at', { ascending: false }).limit(5),
         supabase.from('clients').select('id'),
       ]);
@@ -48,7 +47,6 @@ export default function DashboardPage() {
       ].filter(Boolean))];
       let cmap: Record<string, string> = {};
       if (ids.length > 0) {
-        // fixed: use full_name instead of name
         const { data: cls } = await supabase.from('clients').select('id,full_name').in('id', ids);
         (cls ?? []).forEach((c: any) => { cmap[c.id] = c.full_name; });
       }
@@ -76,7 +74,6 @@ export default function DashboardPage() {
     const outstanding   = unpaidInv.reduce((s: number, i: any) => s + convert(parseFloat(i.total ?? i.amount ?? 0), i.currency || 'SAR'), 0);
 
     const thisMonth = paid.filter((i: any) => {
-      // fixed: fall back to date, then created_at if due_date is null
       const dateStr = i.due_date ?? i.date ?? i.created_at ?? '';
       const d = new Date(dateStr);
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -97,7 +94,6 @@ export default function DashboardPage() {
       return { key: d.toISOString().slice(0, 7), label: d.toLocaleString('en', { month: 'short' }) };
     });
 
-    // fixed: use due_date ?? date ?? created_at for chart grouping
     const getDateKey = (i: any) => (i.due_date ?? i.date ?? i.created_at ?? '').slice(0, 7);
 
     const revenueByMonth = months.map(m => {
@@ -105,7 +101,7 @@ export default function DashboardPage() {
         .reduce((s: number, i: any) => s + convert(parseFloat(i.total ?? i.amount ?? 0), i.currency || 'SAR'), 0);
       const exp = rawExpenses.filter((e: any) => (e.date ?? '').startsWith(m.key))
         .reduce((s: number, e: any) => s + convert(parseFloat(e.amount ?? 0), e.currency || 'SAR'), 0);
-      return { month: m.label, revenue: rev, profit: rev - exp };
+      return { month: m.label, revenue: rev, profit: Math.max(rev - exp, 0) };
     });
 
     const cashFlow = months.map(m => ({
@@ -127,8 +123,13 @@ export default function DashboardPage() {
     };
   }, [rawInvoices, rawExpenses, rawProjects, clientMap, convert, currency]);
 
-  const maxRev  = Math.max(...stats.revenueByMonth.map(m => m.revenue), 1);
-  const maxCash = Math.max(...stats.cashFlow.flatMap(m => [m.income, m.expenses]), 1);
+  // Max values — always at least 1 to avoid div-by-zero; add 10% headroom
+  const maxRev  = Math.max(...stats.revenueByMonth.map(m => m.revenue), 1) * 1.1;
+  const maxCash = Math.max(...stats.cashFlow.flatMap(m => [m.income, m.expenses]), 1) * 1.1;
+
+  // Whether there is any real data to show in the charts
+  const hasRevenueData = stats.revenueByMonth.some(m => m.revenue > 0 || m.profit > 0);
+  const hasCashData    = stats.cashFlow.some(m => m.income > 0 || m.expenses > 0);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -185,40 +186,91 @@ export default function DashboardPage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Revenue & Profit Chart */}
         <div className="bg-surface border border-border rounded-xl p-5">
           <h2 className="text-text-primary font-semibold text-sm mb-4">Revenue &amp; Profit</h2>
-          <div className="flex items-end gap-1 h-32">
-            {stats.revenueByMonth.map((m, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                <div className="w-full flex flex-col justify-end gap-0.5" style={{ height: '100%' }}>
-                  <div className="w-full bg-primary/20 rounded-sm" style={{ height: `${(m.revenue / maxRev) * 100}%`, minHeight: m.revenue > 0 ? '2px' : '0' }} />
-                  <div className="w-full bg-accent/40 rounded-sm" style={{ height: `${(Math.max(m.profit, 0) / maxRev) * 100}%`, minHeight: m.profit > 0 ? '2px' : '0' }} />
-                </div>
-                <span className="text-text-faint" style={{ fontSize: '9px' }}>{m.month}</span>
-              </div>
-            ))}
-          </div>
+          {!hasRevenueData ? (
+            <div className="flex items-center justify-center h-32 text-text-faint text-xs">No data yet — add paid invoices to see your chart</div>
+          ) : (
+            <div className="flex items-end gap-1 h-32">
+              {stats.revenueByMonth.map((m, i) => {
+                const revH = Math.round((m.revenue / maxRev) * 100);
+                const profH = Math.round((m.profit / maxRev) * 100);
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5 h-full">
+                    {/* bars grow from the bottom */}
+                    <div className="w-full flex-1 flex flex-col justify-end gap-0.5">
+                      {m.revenue > 0 && (
+                        <div
+                          className="w-full rounded-sm bg-primary/40"
+                          style={{ height: `${revH}%`, minHeight: '2px' }}
+                          title={`Revenue: ${fmt(m.revenue)}`}
+                        />
+                      )}
+                      {m.profit > 0 && (
+                        <div
+                          className="w-full rounded-sm bg-accent/60"
+                          style={{ height: `${profH}%`, minHeight: '2px' }}
+                          title={`Profit: ${fmt(m.profit)}`}
+                        />
+                      )}
+                      {m.revenue === 0 && m.profit === 0 && (
+                        <div className="w-full rounded-sm bg-border/40" style={{ height: '2px' }} />
+                      )}
+                    </div>
+                    <span className="text-text-faint" style={{ fontSize: '9px' }}>{m.month}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="flex gap-4 mt-3">
-            <span className="flex items-center gap-1.5 text-text-faint text-xs"><span className="w-3 h-2 rounded-sm bg-primary/20 inline-block" />Revenue</span>
-            <span className="flex items-center gap-1.5 text-text-faint text-xs"><span className="w-3 h-2 rounded-sm bg-accent/40 inline-block" />Profit</span>
+            <span className="flex items-center gap-1.5 text-text-faint text-xs"><span className="w-3 h-2 rounded-sm bg-primary/40 inline-block" />Revenue</span>
+            <span className="flex items-center gap-1.5 text-text-faint text-xs"><span className="w-3 h-2 rounded-sm bg-accent/60 inline-block" />Profit</span>
           </div>
         </div>
+
+        {/* Cash Flow Chart */}
         <div className="bg-surface border border-border rounded-xl p-5">
           <h2 className="text-text-primary font-semibold text-sm mb-4">Cash Flow</h2>
-          <div className="flex items-end gap-1 h-32">
-            {stats.cashFlow.map((m, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                <div className="w-full flex flex-col justify-end gap-0.5" style={{ height: '100%' }}>
-                  <div className="w-full bg-blue-400/30 rounded-sm" style={{ height: `${(m.income / maxCash) * 100}%`, minHeight: m.income > 0 ? '2px' : '0' }} />
-                  <div className="w-full bg-red-400/30 rounded-sm" style={{ height: `${(m.expenses / maxCash) * 100}%`, minHeight: m.expenses > 0 ? '2px' : '0' }} />
-                </div>
-                <span className="text-text-faint" style={{ fontSize: '9px' }}>{m.month}</span>
-              </div>
-            ))}
-          </div>
+          {!hasCashData ? (
+            <div className="flex items-center justify-center h-32 text-text-faint text-xs">No data yet — add invoices &amp; expenses to see cash flow</div>
+          ) : (
+            <div className="flex items-end gap-1 h-32">
+              {stats.cashFlow.map((m, i) => {
+                const incH = Math.round((m.income / maxCash) * 100);
+                const expH = Math.round((m.expenses / maxCash) * 100);
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5 h-full">
+                    <div className="w-full flex-1 flex flex-col justify-end gap-0.5">
+                      {m.income > 0 && (
+                        <div
+                          className="w-full rounded-sm bg-blue-400/50"
+                          style={{ height: `${incH}%`, minHeight: '2px' }}
+                          title={`Income: ${fmt(m.income)}`}
+                        />
+                      )}
+                      {m.expenses > 0 && (
+                        <div
+                          className="w-full rounded-sm bg-red-400/50"
+                          style={{ height: `${expH}%`, minHeight: '2px' }}
+                          title={`Expenses: ${fmt(m.expenses)}`}
+                        />
+                      )}
+                      {m.income === 0 && m.expenses === 0 && (
+                        <div className="w-full rounded-sm bg-border/40" style={{ height: '2px' }} />
+                      )}
+                    </div>
+                    <span className="text-text-faint" style={{ fontSize: '9px' }}>{m.month}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="flex gap-4 mt-3">
-            <span className="flex items-center gap-1.5 text-text-faint text-xs"><span className="w-3 h-2 rounded-sm bg-blue-400/30 inline-block" />Income</span>
-            <span className="flex items-center gap-1.5 text-text-faint text-xs"><span className="w-3 h-2 rounded-sm bg-red-400/30 inline-block" />Expenses</span>
+            <span className="flex items-center gap-1.5 text-text-faint text-xs"><span className="w-3 h-2 rounded-sm bg-blue-400/50 inline-block" />Income</span>
+            <span className="flex items-center gap-1.5 text-text-faint text-xs"><span className="w-3 h-2 rounded-sm bg-red-400/50 inline-block" />Expenses</span>
           </div>
         </div>
       </div>
@@ -231,11 +283,14 @@ export default function DashboardPage() {
             <Users size={14} className="text-text-faint" />
           </div>
           {recentClients.length === 0 ? (
-            <p className="text-text-faint text-xs text-center py-6">No clients yet</p>
+            <div className="flex flex-col items-center py-6 gap-2">
+              <Users size={24} className="text-text-faint/40" />
+              <p className="text-text-faint text-xs text-center">No clients yet</p>
+              <Link href="/dashboard/clients" className="text-primary text-xs hover:underline">Add your first client →</Link>
+            </div>
           ) : recentClients.map(c => (
-            // fixed: use full_name and company_name
             <Link key={c.id} href={`/dashboard/clients/${c.id}`} className="flex items-center gap-3 hover:bg-surface2 rounded-lg p-1.5 -mx-1.5 transition-colors">
-              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">{c.full_name?.[0]?.toUpperCase() ?? '?'}</div>
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0">{c.full_name?.[0]?.toUpperCase() ?? '?'}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-text-primary text-xs font-medium truncate">{c.full_name}</p>
                 {c.company_name && <p className="text-text-faint text-xs truncate">{c.company_name}</p>}
@@ -250,7 +305,11 @@ export default function DashboardPage() {
             <Clock size={14} className="text-text-faint" />
           </div>
           {stats.upcomingDeadlines.length === 0 ? (
-            <p className="text-text-faint text-xs text-center py-6">No upcoming deadlines</p>
+            <div className="flex flex-col items-center py-6 gap-2">
+              <Clock size={24} className="text-text-faint/40" />
+              <p className="text-text-faint text-xs text-center">No upcoming deadlines</p>
+              <Link href="/dashboard/projects" className="text-primary text-xs hover:underline">View projects →</Link>
+            </div>
           ) : stats.upcomingDeadlines.map((p: any) => {
             const days = Math.ceil((new Date(p.deadline).getTime() - Date.now()) / 86400000);
             return (
@@ -271,7 +330,11 @@ export default function DashboardPage() {
             <FileText size={14} className="text-text-faint" />
           </div>
           {stats.unpaidInvoices.length === 0 ? (
-            <p className="text-text-faint text-xs text-center py-6">No unpaid invoices</p>
+            <div className="flex flex-col items-center py-6 gap-2">
+              <FileText size={24} className="text-text-faint/40" />
+              <p className="text-text-faint text-xs text-center">No unpaid invoices</p>
+              <Link href="/dashboard/invoices" className="text-primary text-xs hover:underline">View invoices →</Link>
+            </div>
           ) : stats.unpaidInvoices.slice(0, 5).map((inv: any) => (
             <div key={inv.id} className="flex items-center justify-between gap-2 mb-3">
               <div className="min-w-0">
