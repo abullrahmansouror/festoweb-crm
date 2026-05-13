@@ -19,7 +19,6 @@ export default function DashboardPage() {
   const [totalClients, setTotalClients] = useState(0);
   const [clientMap, setClientMap] = useState<Record<string, string>>({});
 
-  // Load user name once
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const name = data.user?.user_metadata?.full_name || data.user?.email?.split('@')[0] || 'there';
@@ -27,15 +26,15 @@ export default function DashboardPage() {
     });
   }, []);
 
-  // Load raw data once — independent of currency
   useEffect(() => {
     async function load() {
       setLoading(true);
       const [invRes, expRes, projRes, cliRes, allCliRes] = await Promise.all([
-        supabase.from('invoices').select('id,invoice_number,status,total,amount,currency,due_date,client_id,type'),
+        supabase.from('invoices').select('id,invoice_number,status,total,amount,currency,due_date,date,created_at,client_id,type'),
         supabase.from('expenses').select('id,amount,currency,date,category'),
         supabase.from('projects').select('id,title,status,deadline,client_id'),
-        supabase.from('clients').select('id,name,company,created_at').order('created_at', { ascending: false }).limit(5),
+        // fixed: use full_name and company_name — actual column names in DB
+        supabase.from('clients').select('id,full_name,company_name,created_at').order('created_at', { ascending: false }).limit(5),
         supabase.from('clients').select('id'),
       ]);
 
@@ -43,15 +42,15 @@ export default function DashboardPage() {
       const expenses = expRes.data ?? [];
       const projects = projRes.data ?? [];
 
-      // Build client name map
       const ids = [...new Set([
         ...invoices.map((i: any) => i.client_id),
         ...projects.map((p: any) => p.client_id),
       ].filter(Boolean))];
       let cmap: Record<string, string> = {};
       if (ids.length > 0) {
-        const { data: cls } = await supabase.from('clients').select('id,name').in('id', ids);
-        (cls ?? []).forEach((c: any) => { cmap[c.id] = c.name; });
+        // fixed: use full_name instead of name
+        const { data: cls } = await supabase.from('clients').select('id,full_name').in('id', ids);
+        (cls ?? []).forEach((c: any) => { cmap[c.id] = c.full_name; });
       }
 
       setRawInvoices(invoices);
@@ -63,25 +62,26 @@ export default function DashboardPage() {
       setLoading(false);
     }
     load();
-  }, []); // only once
+  }, []);
 
-  // Re-compute derived stats whenever currency or raw data changes
   const stats = useMemo(() => {
     const now = new Date();
 
     const paid      = rawInvoices.filter((i: any) => i.status === 'paid' || i.status === 'Paid');
     const unpaidInv = rawInvoices.filter((i: any) => i.status === 'unpaid' || i.status === 'Overdue' || i.status === 'Sent');
 
-    const totalRevenue    = paid.reduce((s: number, i: any) => s + convert(i.total ?? i.amount ?? 0, i.currency || 'SAR'), 0);
-    const totalExpenses   = rawExpenses.reduce((s: number, e: any) => s + convert(e.amount ?? 0, e.currency || 'SAR'), 0);
-    const totalProfit     = totalRevenue - totalExpenses;
-    const outstanding     = unpaidInv.reduce((s: number, i: any) => s + convert(i.total ?? i.amount ?? 0, i.currency || 'SAR'), 0);
+    const totalRevenue  = paid.reduce((s: number, i: any) => s + convert(parseFloat(i.total ?? i.amount ?? 0), i.currency || 'SAR'), 0);
+    const totalExpenses = rawExpenses.reduce((s: number, e: any) => s + convert(parseFloat(e.amount ?? 0), e.currency || 'SAR'), 0);
+    const totalProfit   = totalRevenue - totalExpenses;
+    const outstanding   = unpaidInv.reduce((s: number, i: any) => s + convert(parseFloat(i.total ?? i.amount ?? 0), i.currency || 'SAR'), 0);
 
     const thisMonth = paid.filter((i: any) => {
-      const d = new Date(i.due_date ?? '');
+      // fixed: fall back to date, then created_at if due_date is null
+      const dateStr = i.due_date ?? i.date ?? i.created_at ?? '';
+      const d = new Date(dateStr);
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
-    const monthlyRecurring = thisMonth.reduce((s: number, i: any) => s + convert(i.total ?? i.amount ?? 0, i.currency || 'SAR'), 0);
+    const monthlyRecurring = thisMonth.reduce((s: number, i: any) => s + convert(parseFloat(i.total ?? i.amount ?? 0), i.currency || 'SAR'), 0);
 
     const activeProjects    = rawProjects.filter((p: any) => p.status === 'active' || p.status === 'in_progress').length;
     const completedProjects = rawProjects.filter((p: any) => p.status === 'completed' || p.status === 'won').length;
@@ -97,20 +97,23 @@ export default function DashboardPage() {
       return { key: d.toISOString().slice(0, 7), label: d.toLocaleString('en', { month: 'short' }) };
     });
 
+    // fixed: use due_date ?? date ?? created_at for chart grouping
+    const getDateKey = (i: any) => (i.due_date ?? i.date ?? i.created_at ?? '').slice(0, 7);
+
     const revenueByMonth = months.map(m => {
-      const rev = paid.filter((i: any) => (i.due_date ?? '').startsWith(m.key))
-        .reduce((s: number, i: any) => s + convert(i.total ?? i.amount ?? 0, i.currency || 'SAR'), 0);
+      const rev = paid.filter((i: any) => getDateKey(i) === m.key)
+        .reduce((s: number, i: any) => s + convert(parseFloat(i.total ?? i.amount ?? 0), i.currency || 'SAR'), 0);
       const exp = rawExpenses.filter((e: any) => (e.date ?? '').startsWith(m.key))
-        .reduce((s: number, e: any) => s + convert(e.amount ?? 0, e.currency || 'SAR'), 0);
+        .reduce((s: number, e: any) => s + convert(parseFloat(e.amount ?? 0), e.currency || 'SAR'), 0);
       return { month: m.label, revenue: rev, profit: rev - exp };
     });
 
     const cashFlow = months.map(m => ({
       month: m.label,
-      income:   paid.filter((i: any) => (i.due_date ?? '').startsWith(m.key))
-        .reduce((s: number, i: any) => s + convert(i.total ?? i.amount ?? 0, i.currency || 'SAR'), 0),
+      income: paid.filter((i: any) => getDateKey(i) === m.key)
+        .reduce((s: number, i: any) => s + convert(parseFloat(i.total ?? i.amount ?? 0), i.currency || 'SAR'), 0),
       expenses: rawExpenses.filter((e: any) => (e.date ?? '').startsWith(m.key))
-        .reduce((s: number, e: any) => s + convert(e.amount ?? 0, e.currency || 'SAR'), 0),
+        .reduce((s: number, e: any) => s + convert(parseFloat(e.amount ?? 0), e.currency || 'SAR'), 0),
     }));
 
     return {
@@ -145,10 +148,10 @@ export default function DashboardPage() {
       {/* KPI Row 1 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'TOTAL REVENUE',       value: fmt(stats.totalRevenue),       sub: `${stats.paidCount} paid invoices`, icon: DollarSign,   color: 'text-accent bg-accent/10' },
-          { label: 'TOTAL PROFIT',        value: fmt(stats.totalProfit),        sub: 'After expenses',  icon: TrendingUp,   color: stats.totalProfit >= 0 ? 'text-accent bg-accent/10' : 'text-red-400 bg-red-400/10' },
-          { label: 'TOTAL EXPENSES',      value: fmt(stats.totalExpenses),      sub: `${rawExpenses.length} expense records`, icon: TrendingDown, color: 'text-red-400 bg-red-400/10' },
-          { label: 'OUTSTANDING INVOICES',value: fmt(stats.outstanding),        sub: `${stats.outstandingCount} unpaid`, icon: AlertCircle,  color: 'text-amber-400 bg-amber-400/10' },
+          { label: 'TOTAL REVENUE',       value: fmt(stats.totalRevenue),  sub: `${stats.paidCount} paid invoices`,          icon: DollarSign,   color: 'text-accent bg-accent/10' },
+          { label: 'TOTAL PROFIT',        value: fmt(stats.totalProfit),   sub: 'After expenses',                            icon: TrendingUp,   color: stats.totalProfit >= 0 ? 'text-accent bg-accent/10' : 'text-red-400 bg-red-400/10' },
+          { label: 'TOTAL EXPENSES',      value: fmt(stats.totalExpenses), sub: `${rawExpenses.length} expense records`,     icon: TrendingDown, color: 'text-red-400 bg-red-400/10' },
+          { label: 'OUTSTANDING INVOICES',value: fmt(stats.outstanding),   sub: `${stats.outstandingCount} unpaid`,          icon: AlertCircle,  color: 'text-amber-400 bg-amber-400/10' },
         ].map(card => (
           <div key={card.label} className="bg-surface border border-border rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
@@ -165,9 +168,9 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'MONTHLY RECURRING',  value: fmt(stats.monthlyRecurring), sub: new Date().toLocaleString('en',{month:'long'}), icon: DollarSign,  color: 'text-primary bg-primary/10' },
-          { label: 'ACTIVE PROJECTS',    value: String(stats.activeProjects),       sub: 'In pipeline',   icon: Briefcase,   color: 'text-blue-400 bg-blue-400/10' },
-          { label: 'COMPLETED PROJECTS', value: String(stats.completedProjects),    sub: 'Deals won',     icon: CheckCircle, color: 'text-accent bg-accent/10' },
-          { label: 'TOTAL CLIENTS',      value: String(totalClients),               sub: `${totalClients} registered`,  icon: Users,       color: 'text-purple-400 bg-purple-400/10' },
+          { label: 'ACTIVE PROJECTS',    value: String(stats.activeProjects),    sub: 'In pipeline', icon: Briefcase,   color: 'text-blue-400 bg-blue-400/10' },
+          { label: 'COMPLETED PROJECTS', value: String(stats.completedProjects), sub: 'Deals won',   icon: CheckCircle, color: 'text-accent bg-accent/10' },
+          { label: 'TOTAL CLIENTS',      value: String(totalClients),            sub: `${totalClients} registered`, icon: Users, color: 'text-purple-400 bg-purple-400/10' },
         ].map(card => (
           <div key={card.label} className="bg-surface border border-border rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
@@ -230,11 +233,12 @@ export default function DashboardPage() {
           {recentClients.length === 0 ? (
             <p className="text-text-faint text-xs text-center py-6">No clients yet</p>
           ) : recentClients.map(c => (
+            // fixed: use full_name and company_name
             <Link key={c.id} href={`/dashboard/clients/${c.id}`} className="flex items-center gap-3 hover:bg-surface2 rounded-lg p-1.5 -mx-1.5 transition-colors">
-              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">{c.name[0]?.toUpperCase()}</div>
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">{c.full_name?.[0]?.toUpperCase() ?? '?'}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-text-primary text-xs font-medium truncate">{c.name}</p>
-                {c.company && <p className="text-text-faint text-xs truncate">{c.company}</p>}
+                <p className="text-text-primary text-xs font-medium truncate">{c.full_name}</p>
+                {c.company_name && <p className="text-text-faint text-xs truncate">{c.company_name}</p>}
               </div>
             </Link>
           ))}
@@ -275,7 +279,7 @@ export default function DashboardPage() {
                 <p className="text-text-faint text-xs">{inv.client_name ?? '—'}</p>
               </div>
               <span className="text-amber-400 text-xs font-medium tabular-nums whitespace-nowrap">
-                {fmt(convert(inv.total ?? inv.amount ?? 0, inv.currency || 'SAR'))}
+                {fmt(convert(parseFloat(inv.total ?? inv.amount ?? 0), inv.currency || 'SAR'))}
               </span>
             </div>
           ))}
