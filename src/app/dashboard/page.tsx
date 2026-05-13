@@ -25,7 +25,6 @@ function BarChart({
   height?: number;
   legend: { label: string; color: string }[];
 }) {
-  // FIX: use Math.abs so negative profit values still count as "has data"
   const hasData = series.some(s => s.some(bar => Math.abs(bar.value) > 0));
   const seriesCount = series.length;
 
@@ -49,11 +48,9 @@ function BarChart({
               <div className="w-full flex-1 relative" style={{ minHeight: 0 }}>
                 {series.map((s, si) => {
                   const val = s[mi]?.value ?? 0;
-                  // FIX: always use absolute value for height — negative values were producing 0/NaN heights
                   const absVal = Math.abs(val);
                   const pct = maxVal > 0 ? (absVal / maxVal) * 100 : 0;
                   const left = si * (100 / seriesCount);
-                  // FIX: negative profit bar turns red
                   const color = val < 0 ? 'rgba(252,129,74,0.85)' : s[mi]?.color;
                   return (
                     <div
@@ -95,6 +92,33 @@ function BarChart({
       </div>
     </div>
   );
+}
+
+/* ─── robust date → "YYYY-MM" helper ─────────────────────────────────────── */
+/**
+ * Converts ANY date string/value into a "YYYY-MM" key for chart bucketing.
+ * Handles: ISO strings, timestamps, DD/MM/YYYY, MM/DD/YYYY, etc.
+ * Falls back to empty string if unparseable.
+ */
+function toYearMonth(raw: any): string {
+  if (!raw) return '';
+  // If it's already ISO-like "2026-05-..." just slice
+  if (typeof raw === 'string' && /^\d{4}-\d{2}/.test(raw)) {
+    return raw.slice(0, 7);
+  }
+  // Try native Date parse (handles timestamps, locale strings, etc.)
+  const d = new Date(raw);
+  if (!isNaN(d.getTime())) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+  // Try DD/MM/YYYY
+  if (typeof raw === 'string' && /^\d{1,2}\/\d{1,2}\/\d{4}/.test(raw)) {
+    const parts = raw.split('/');
+    const year = parts[2];
+    const month = parts[1].padStart(2, '0');
+    return `${year}-${month}`;
+  }
+  return '';
 }
 
 /* ─── dashboard page ──────────────────────────────────────────────────────── */
@@ -164,9 +188,9 @@ export default function DashboardPage() {
     const now = new Date();
     const conv = (v: any, cur: string) => convert(parseFloat(v ?? 0), cur || 'SAR');
 
-    const paidIncome     = rawInvoices.filter((i: any) => i.type === 'income'  && (i.status === 'paid' || i.status === 'Paid'));
+    const paidIncome      = rawInvoices.filter((i: any) => i.type === 'income'  && (i.status === 'paid' || i.status === 'Paid'));
     const expenseInvoices = rawInvoices.filter((i: any) => i.type === 'expense');
-    const unpaidInv      = rawInvoices.filter((i: any) => i.type === 'income' && (i.status === 'unpaid' || i.status === 'Overdue' || i.status === 'Sent'));
+    const unpaidInv       = rawInvoices.filter((i: any) => i.type === 'income' && (i.status === 'unpaid' || i.status === 'Overdue' || i.status === 'Sent'));
 
     const totalRevenue  = paidIncome.reduce     ((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
     const totalExpenses = expenseInvoices.reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
@@ -191,11 +215,16 @@ export default function DashboardPage() {
     // rolling 12 months
     const months = Array.from({ length: 12 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
-      return { key: d.toISOString().slice(0, 7), label: d.toLocaleString('en', { month: 'short' }) };
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return { key, label: d.toLocaleString('en', { month: 'short' }) };
     });
 
-    const invDateKey = (i: any) => (i.date ?? i.due_date ?? i.created_at ?? '').slice(0, 7);
-    const expDateKey = (i: any) => (i.date ?? i.created_at ?? '').slice(0, 7);
+    // FIX: use robust toYearMonth() instead of brittle .slice(0,7)
+    // Also fall back chain: date → due_date → created_at
+    const invDateKey = (i: any) =>
+      toYearMonth(i.date) || toYearMonth(i.due_date) || toYearMonth(i.created_at);
+    const expDateKey = (i: any) =>
+      toYearMonth(i.date) || toYearMonth(i.created_at);
 
     // Revenue & Profit
     const revSeries: BarSeries = months.map(m => ({
@@ -221,7 +250,6 @@ export default function DashboardPage() {
       color: 'rgba(252,129,74,0.8)',
     }));
 
-    // FIX: maxVal uses Math.abs so negative profit doesn't collapse the scale
     const maxRev  = Math.max(...revSeries.map(b => b.value), ...profSeries.map(b => Math.abs(b.value)), 1) * 1.15;
     const maxCash = Math.max(...incomeSeries.map(b => b.value), ...expSeries.map(b => b.value), 1) * 1.15;
 
