@@ -28,7 +28,6 @@ function BarChart({
   const hasData = series.some(s => s.some(bar => bar.value > 0));
   const barCount = series[0]?.length ?? 0;
   const seriesCount = series.length;
-  // individual bar width as fraction of column
   const barW = Math.max(1, Math.floor(100 / barCount / (seriesCount + 1)));
 
   return (
@@ -48,7 +47,6 @@ function BarChart({
               className="flex-1 flex flex-col items-center"
               style={{ height: '100%' }}
             >
-              {/* bar area — position:relative so bars can anchor to bottom */}
               <div
                 className="w-full flex-1 relative"
                 style={{ minHeight: 0 }}
@@ -77,7 +75,6 @@ function BarChart({
                   );
                 })}
               </div>
-              {/* month label */}
               <span
                 className="text-text-faint shrink-0 mt-1 text-center"
                 style={{ fontSize: '9px', lineHeight: 1.2 }}
@@ -88,7 +85,6 @@ function BarChart({
           ))}
         </div>
       )}
-      {/* legend */}
       <div className="flex gap-4 mt-3">
         {legend.map(l => (
           <span key={l.label} className="flex items-center gap-1.5 text-text-faint text-xs">
@@ -112,7 +108,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const [rawInvoices,   setRawInvoices]   = useState<any[]>([]);
-  const [rawExpenses,   setRawExpenses]   = useState<any[]>([]);
   const [rawProjects,   setRawProjects]   = useState<any[]>([]);
   const [recentClients, setRecentClients] = useState<any[]>([]);
   const [totalClients,  setTotalClients]  = useState(0);
@@ -131,11 +126,10 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [invRes, expRes, projRes, cliRes, allCliRes] = await Promise.all([
+      const [invRes, projRes, cliRes, allCliRes] = await Promise.all([
         supabase
           .from('invoices')
           .select('id,invoice_number,status,total,amount,currency,due_date,date,created_at,client_id,type'),
-        supabase.from('expenses').select('id,amount,currency,date,category'),
         supabase.from('projects').select('id,title,status,deadline,client_id'),
         supabase
           .from('clients')
@@ -146,7 +140,6 @@ export default function DashboardPage() {
       ]);
 
       const invoices = invRes.data ?? [];
-      const expenses = expRes.data ?? [];
       const projects = projRes.data ?? [];
 
       const ids = [
@@ -168,7 +161,6 @@ export default function DashboardPage() {
       }
 
       setRawInvoices(invoices);
-      setRawExpenses(expenses);
       setRawProjects(projects);
       setRecentClients(cliRes.data ?? []);
       setTotalClients(allCliRes.data?.length ?? 0);
@@ -181,20 +173,28 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     const now = new Date();
 
-    const paid      = rawInvoices.filter((i: any) => i.status === 'paid' || i.status === 'Paid');
-    const unpaidInv = rawInvoices.filter(
-      (i: any) => i.status === 'unpaid' || i.status === 'Overdue' || i.status === 'Sent'
-    );
-
     const conv = (v: any, cur: string) => convert(parseFloat(v ?? 0), cur || 'SAR');
 
-    const totalRevenue  = paid.reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
-    const totalExpenses = rawExpenses.reduce((s: number, e: any) => s + conv(e.amount, e.currency), 0);
+    // FIX: income invoices = type 'income' + status Paid
+    const paidIncome = rawInvoices.filter(
+      (i: any) => i.type === 'income' && (i.status === 'paid' || i.status === 'Paid')
+    );
+    // FIX: expense invoices = type 'expense' (all statuses count as expenses)
+    const expenseInvoices = rawInvoices.filter((i: any) => i.type === 'expense');
+
+    const unpaidInv = rawInvoices.filter(
+      (i: any) =>
+        i.type === 'income' &&
+        (i.status === 'unpaid' || i.status === 'Overdue' || i.status === 'Sent')
+    );
+
+    const totalRevenue  = paidIncome.reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
+    const totalExpenses = expenseInvoices.reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
     const totalProfit   = totalRevenue - totalExpenses;
     const outstanding   = unpaidInv.reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
 
-    const thisMonth = paid.filter((i: any) => {
-      const d = new Date(i.due_date ?? i.date ?? i.created_at ?? '');
+    const thisMonth = paidIncome.filter((i: any) => {
+      const d = new Date(i.date ?? i.due_date ?? i.created_at ?? '');
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
     const monthlyRecurring = thisMonth.reduce(
@@ -219,42 +219,45 @@ export default function DashboardPage() {
       };
     });
 
-    const dateKey = (i: any) => (i.due_date ?? i.date ?? i.created_at ?? '').slice(0, 7);
+    // FIX: use 'date' as primary key for invoices (most reliable field)
+    const invDateKey = (i: any) => (i.date ?? i.due_date ?? i.created_at ?? '').slice(0, 7);
+    const expDateKey = (i: any) => (i.date ?? i.created_at ?? '').slice(0, 7);
 
     // Revenue & Profit — two series
     const revSeries: BarSeries = months.map(m => {
-      const rev = paid
-        .filter((i: any) => dateKey(i) === m.key)
+      const rev = paidIncome
+        .filter((i: any) => invDateKey(i) === m.key)
         .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
       return { label: m.label, value: rev, color: 'rgba(99,179,237,0.7)' };
     });
     const profSeries: BarSeries = months.map(m => {
-      const rev = paid
-        .filter((i: any) => dateKey(i) === m.key)
+      const rev = paidIncome
+        .filter((i: any) => invDateKey(i) === m.key)
         .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
-      const exp = rawExpenses
-        .filter((e: any) => (e.date ?? '').startsWith(m.key))
-        .reduce((s: number, e: any) => s + conv(e.amount, e.currency), 0);
-      return { label: m.label, value: Math.max(rev - exp, 0), color: 'rgba(72,187,120,0.75)' };
+      const exp = expenseInvoices
+        .filter((i: any) => expDateKey(i) === m.key)
+        .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
+      // FIX: allow negative profit to show losses (removed Math.max clamp)
+      return { label: m.label, value: rev - exp, color: 'rgba(72,187,120,0.75)' };
     });
 
-    // Cash Flow — two series
+    // Cash Flow — income vs expenses per month
     const incomeSeries: BarSeries = months.map(m => ({
       label: m.label,
-      value: paid
-        .filter((i: any) => dateKey(i) === m.key)
+      value: paidIncome
+        .filter((i: any) => invDateKey(i) === m.key)
         .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
       color: 'rgba(99,179,237,0.7)',
     }));
     const expSeries: BarSeries = months.map(m => ({
       label: m.label,
-      value: rawExpenses
-        .filter((e: any) => (e.date ?? '').startsWith(m.key))
-        .reduce((s: number, e: any) => s + conv(e.amount, e.currency), 0),
+      value: expenseInvoices
+        .filter((i: any) => expDateKey(i) === m.key)
+        .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
       color: 'rgba(252,129,74,0.75)',
     }));
 
-    const maxRev  = Math.max(...revSeries.map(b => b.value),  ...profSeries.map(b => b.value),  1) * 1.15;
+    const maxRev  = Math.max(...revSeries.map(b => b.value), ...profSeries.map(b => Math.abs(b.value)), 1) * 1.15;
     const maxCash = Math.max(...incomeSeries.map(b => b.value), ...expSeries.map(b => b.value), 1) * 1.15;
 
     return {
@@ -263,12 +266,12 @@ export default function DashboardPage() {
       monthlyRecurring, activeProjects, completedProjects,
       upcomingDeadlines,
       unpaidInvoices: unpaidInv.map((i: any) => ({ ...i, client_name: clientMap[i.client_id] })),
-      paidCount: paid.length,
+      paidCount: paidIncome.length,
       months: months.map(m => m.label),
       revSeries, profSeries, maxRev,
       incomeSeries, expSeries, maxCash,
     };
-  }, [rawInvoices, rawExpenses, rawProjects, clientMap, convert, currency]);
+  }, [rawInvoices, rawProjects, clientMap, convert, currency]);
 
   if (loading)
     return (
@@ -295,7 +298,7 @@ export default function DashboardPage() {
         {[
           { label: 'TOTAL REVENUE',        value: fmt(stats.totalRevenue),  sub: `${stats.paidCount} paid invoices`,      icon: DollarSign,   color: 'text-accent bg-accent/10' },
           { label: 'TOTAL PROFIT',         value: fmt(stats.totalProfit),   sub: 'After expenses',                        icon: TrendingUp,   color: stats.totalProfit >= 0 ? 'text-accent bg-accent/10' : 'text-red-400 bg-red-400/10' },
-          { label: 'TOTAL EXPENSES',       value: fmt(stats.totalExpenses), sub: `${rawExpenses.length} expense records`, icon: TrendingDown, color: 'text-red-400 bg-red-400/10' },
+          { label: 'TOTAL EXPENSES',       value: fmt(stats.totalExpenses), sub: `From expense invoices`,                 icon: TrendingDown, color: 'text-red-400 bg-red-400/10' },
           { label: 'OUTSTANDING INVOICES', value: fmt(stats.outstanding),   sub: `${stats.outstandingCount} unpaid`,      icon: AlertCircle,  color: 'text-amber-400 bg-amber-400/10' },
         ].map(card => (
           <div key={card.label} className="bg-surface border border-border rounded-xl p-4">
