@@ -2,24 +2,25 @@
 
 import { GripVertical, Edit, Trash2, Calendar } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { useCurrency } from '@/lib/currency-context';
 import type { PipelineCard } from '@/types';
 
 const serviceLabels: Record<string, string> = {
-  website_design: 'Web Design',
-  website_redesign: 'Redesign',
-  landing_page: 'Landing Page',
-  maintenance: 'Maintenance',
-  ecommerce: 'E-commerce',
+  website_design: 'Web Design', website_redesign: 'Redesign',
+  landing_page: 'Landing Page', maintenance: 'Maintenance', ecommerce: 'E-commerce',
 };
 
-interface PipelineCardItemProps {
+interface Props {
   card: PipelineCard;
   onDragStart: (id: string) => void;
   onEdit: (card: PipelineCard) => void;
   onDelete: (id: string) => void;
 }
 
-export function PipelineCardItem({ card, onDragStart, onEdit, onDelete }: PipelineCardItemProps) {
+export function PipelineCardItem({ card, onDragStart, onEdit, onDelete }: Props) {
+  const { fmt, convert } = useCurrency();
+  const cardCurrency = (card as any).currency || 'SAR';
+
   return (
     <div
       draggable
@@ -38,12 +39,15 @@ export function PipelineCardItem({ card, onDragStart, onEdit, onDelete }: Pipeli
       </div>
       {card.company_name && <p className="text-text-faint text-xs ml-4 mb-1">{card.company_name}</p>}
       <div className="ml-4 space-y-1">
-        <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{serviceLabels[card.service_type]}</span>
-        {card.value && <p className="text-accent text-xs font-medium">SAR {card.value.toLocaleString()}</p>}
+        {card.service_type && (
+          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{serviceLabels[card.service_type] ?? card.service_type}</span>
+        )}
+        {card.value != null && (
+          <p className="text-accent text-xs font-medium">{fmt(convert(card.value, cardCurrency))}</p>
+        )}
         {card.next_follow_up && (
           <div className="flex items-center gap-1 text-text-faint text-xs">
-            <Calendar size={10} />
-            {formatDate(card.next_follow_up)}
+            <Calendar size={10} />{formatDate(card.next_follow_up)}
           </div>
         )}
       </div>
