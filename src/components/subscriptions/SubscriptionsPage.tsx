@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Plus, Pencil, Trash2, Globe, Server, Wrench, Package,
-  TrendingUp, AlertTriangle, CheckCircle, PauseCircle, X, Loader2
+  TrendingUp, AlertTriangle, CheckCircle, PauseCircle, X, Loader2, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,8 +26,8 @@ interface Subscription {
   created_at: string;
 }
 
-// Exchange rates to SAR (approximate fixed rates)
-const TO_SAR: Record<string, number> = {
+// Fallback fixed rates if API fails
+const FALLBACK_RATES: Record<string, number> = {
   SAR: 1,
   USD: 3.75,
   EUR: 4.10,
@@ -35,10 +35,6 @@ const TO_SAR: Record<string, number> = {
   AED: 1.02,
   MAD: 0.37,
 };
-
-function toSAR(amount: number, currency: string): number {
-  return amount * (TO_SAR[currency] ?? 1);
-}
 
 const CATEGORY_META: Record<Category, { label: string; icon: React.ElementType; color: string }> = {
   hosting: { label: 'Hosting', icon: Server, color: 'text-blue-400 bg-blue-400/10' },
@@ -67,11 +63,6 @@ function daysUntil(dateStr: string) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-function toYearlySAR(cost: number, currency: string, cycle: BillingCycle): number {
-  const sarAmount = toSAR(cost, currency);
-  return cycle === 'monthly' ? sarAmount * 12 : sarAmount;
-}
-
 export function SubscriptionsPage() {
   const supabase = createClient();
   const [subs, setSubs] = useState<Subscription[]>([]);
@@ -82,6 +73,47 @@ export function SubscriptionsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [filterCat, setFilterCat] = useState<Category | 'all'>('all');
+
+  // Live exchange rates state
+  const [rates, setRates] = useState<Record<string, number>>(FALLBACK_RATES);
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [ratesUpdatedAt, setRatesUpdatedAt] = useState<string | null>(null);
+  const [ratesError, setRatesError] = useState(false);
+
+  const fetchRates = useCallback(async () => {
+    setRatesLoading(true);
+    setRatesError(false);
+    try {
+      const res = await fetch('https://api.frankfurter.app/latest?from=SAR&to=USD,EUR,GBP,AED,MAD');
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      // data.rates = { USD: 0.266..., EUR: 0.244..., ... } (1 SAR = X foreign)
+      // We need TO_SAR: 1 foreign = X SAR → invert
+      const toSarRates: Record<string, number> = { SAR: 1 };
+      for (const [currency, rate] of Object.entries(data.rates as Record<string, number>)) {
+        toSarRates[currency] = 1 / rate;
+      }
+      setRates(toSarRates);
+      setRatesUpdatedAt(new Date().toLocaleTimeString('en-SA', { hour: '2-digit', minute: '2-digit' }));
+    } catch {
+      setRatesError(true);
+      setRates(FALLBACK_RATES);
+    } finally {
+      setRatesLoading(false);
+    }
+  }, []);
+
+  // Fetch rates on mount
+  useEffect(() => { fetchRates(); }, [fetchRates]);
+
+  function toSAR(amount: number, currency: string): number {
+    return amount * (rates[currency] ?? FALLBACK_RATES[currency] ?? 1);
+  }
+
+  function toYearlySAR(cost: number, currency: string, cycle: BillingCycle): number {
+    const sarAmount = toSAR(cost, currency);
+    return cycle === 'monthly' ? sarAmount * 12 : sarAmount;
+  }
 
   async function load() {
     setLoading(true);
@@ -100,7 +132,7 @@ export function SubscriptionsPage() {
 
   const totalYearlySAR = useMemo(() =>
     activeSubs.reduce((sum, s) => sum + toYearlySAR(s.cost, s.currency, s.billing_cycle), 0),
-    [activeSubs]
+    [activeSubs, rates]
   );
   const totalMonthlySAR = useMemo(() => totalYearlySAR / 12, [totalYearlySAR]);
 
@@ -175,6 +207,7 @@ export function SubscriptionsPage() {
   }
 
   const f = (n: number) => n.toLocaleString('en-SA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const f2 = (n: number) => n.toLocaleString('en-SA', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
   return (
     <div className="space-y-6">
@@ -211,13 +244,37 @@ export function SubscriptionsPage() {
         ))}
       </div>
 
-      {/* Exchange Rate Notice */}
+      {/* Live Exchange Rate Notice */}
       {activeSubs.some(s => s.currency !== 'SAR') && (
-        <div className="bg-blue-400/10 border border-blue-400/20 rounded-xl p-3 flex items-center gap-2">
-          <span className="text-blue-400 text-xs font-medium">ℹ️</span>
-          <p className="text-text-muted text-xs">
-            Stats are converted to SAR using fixed rates: 1 USD = 3.75 · 1 EUR = 4.10 · 1 GBP = 4.75 · 1 AED = 1.02 · 1 MAD = 0.37
-          </p>
+        <div className={cn(
+          'border rounded-xl p-3 flex items-center gap-3',
+          ratesError
+            ? 'bg-amber-400/10 border-amber-400/20'
+            : 'bg-blue-400/10 border-blue-400/20'
+        )}>
+          <span className="text-xs">{ratesError ? '⚠️' : '🔴'}</span>
+          <div className="flex-1">
+            {ratesError ? (
+              <p className="text-text-muted text-xs">Using fallback rates · Could not reach exchange API</p>
+            ) : (
+              <p className="text-text-muted text-xs">
+                <span className="text-blue-400 font-medium">Live rates</span>
+                {' · '}
+                {Object.entries(rates).filter(([k]) => k !== 'SAR').map(([cur, rate]) =>
+                  `1 ${cur} = SAR ${f2(rate)}`
+                ).join(' · ')}
+                {ratesUpdatedAt && <span className="text-text-faint"> · Updated {ratesUpdatedAt}</span>}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={fetchRates}
+            disabled={ratesLoading}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface2 transition-colors"
+            title="Refresh rates"
+          >
+            <RefreshCw size={13} className={ratesLoading ? 'animate-spin' : ''} />
+          </button>
         </div>
       )}
 
@@ -411,7 +468,7 @@ export function SubscriptionsPage() {
               {form.currency !== 'SAR' && form.cost && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
                   <p className="text-primary text-xs">
-                    ≈ SAR {f(toSAR(parseFloat(form.cost) || 0, form.currency))} at current rate
+                    ≈ SAR {f(toSAR(parseFloat(form.cost) || 0, form.currency))} (live rate)
                     {form.billing_cycle === 'monthly' && ` · SAR ${f(toSAR(parseFloat(form.cost) || 0, form.currency) * 12)}/yr`}
                   </p>
                 </div>
