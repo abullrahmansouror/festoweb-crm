@@ -35,99 +35,134 @@ function BarChart({
   maxVal: number;
   legend: { label: string; color: string }[];
 }) {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const hasData = series.some(s => s.some(b => Math.abs(b.value) > 0));
 
   const W = 600;
-  const H = 160;
+  const H = 180;
   const PAD_LEFT = 10;
   const PAD_RIGHT = 10;
-  const PAD_BOTTOM = 24;
-  const PAD_TOP = 8;
+  const PAD_BOTTOM = 28;
+  const PAD_TOP = 12;
   const chartH = H - PAD_BOTTOM - PAD_TOP;
   const chartW = W - PAD_LEFT - PAD_RIGHT;
   const n = months.length;
   const s = series.length;
   const groupW = chartW / n;
-  // Minimum bar width 6px, max uses 75% of group width split evenly
-  const barW = Math.max(6, Math.min(18, (groupW * 0.75) / s));
+  const barW = Math.max(8, Math.min(22, (groupW * 0.72) / s));
   const groupGap = (groupW - barW * s) / 2;
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       {!hasData ? (
         <div
-          className="flex flex-col items-center justify-center gap-2"
-          style={{ height: H, color: '#555' }}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, height: H, color: '#555' }}
         >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <rect x="3" y="12" width="4" height="9" rx="1"/>
             <rect x="10" y="7" width="4" height="14" rx="1" opacity=".4"/>
             <rect x="17" y="4" width="4" height="17" rx="1" opacity=".2"/>
           </svg>
-          <span style={{ fontSize: 11 }}>No data yet</span>
+          <span style={{ fontSize: 12 }}>No data yet — add invoices to see charts</span>
         </div>
       ) : (
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          width="100%"
-          style={{ display: 'block', overflow: 'visible' }}
-          aria-hidden="true"
-        >
-          {/* grid lines */}
-          {[0.25, 0.5, 0.75, 1].map(f => (
-            <line
-              key={f}
-              x1={PAD_LEFT} y1={PAD_TOP + chartH * (1 - f)}
-              x2={PAD_LEFT + chartW} y2={PAD_TOP + chartH * (1 - f)}
-              stroke="#ffffff" strokeOpacity={0.05} strokeWidth={1}
-            />
-          ))}
+        <>
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            width="100%"
+            style={{ display: 'block', overflow: 'visible', cursor: 'crosshair' }}
+            aria-hidden="true"
+            onMouseLeave={() => setTooltip(null)}
+          >
+            {/* Subtle grid lines */}
+            {[0.25, 0.5, 0.75, 1].map(f => (
+              <line
+                key={f}
+                x1={PAD_LEFT} y1={PAD_TOP + chartH * (1 - f)}
+                x2={PAD_LEFT + chartW} y2={PAD_TOP + chartH * (1 - f)}
+                stroke="#ffffff" strokeOpacity={0.04} strokeWidth={1}
+              />
+            ))}
 
-          {months.map((month, mi) => {
-            const gx = PAD_LEFT + mi * groupW;
-            return (
-              <g key={mi}>
-                <text
-                  x={gx + groupW / 2}
-                  y={H - 6}
-                  textAnchor="middle"
-                  fontSize={9}
-                  fill="#555"
-                >
-                  {month}
-                </text>
+            {months.map((month, mi) => {
+              const gx = PAD_LEFT + mi * groupW;
+              return (
+                <g key={mi}>
+                  {/* Month label */}
+                  <text
+                    x={gx + groupW / 2}
+                    y={H - 8}
+                    textAnchor="middle"
+                    fontSize={n > 8 ? 8 : 10}
+                    fill="#555"
+                  >
+                    {month}
+                  </text>
 
-                {series.map((s_data, si) => {
-                  const val = s_data[mi]?.value ?? 0;
-                  const absVal = Math.abs(val);
-                  const pct = maxVal > 0 ? absVal / maxVal : 0;
-                  const barH = Math.max(absVal > 0 ? 3 : 0, pct * chartH);
-                  const bx = gx + groupGap + si * barW;
-                  const by = PAD_TOP + chartH - barH;
-                  const fill = val < 0 ? 'rgba(252,129,74,0.85)' : (s_data[mi]?.color ?? '#6366f1');
-                  return (
-                    <rect
-                      key={si}
-                      x={bx} y={by}
-                      width={barW - 1}
-                      height={barH}
-                      rx={2} ry={2}
-                      fill={fill}
-                      opacity={absVal > 0 ? 1 : 0}
-                    >
-                      <title>{`${month}: ${val.toLocaleString('en', { maximumFractionDigits: 0 })}`}</title>
-                    </rect>
-                  );
-                })}
-              </g>
-            );
-          })}
-        </svg>
+                  {series.map((s_data, si) => {
+                    const val = s_data[mi]?.value ?? 0;
+                    const absVal = Math.abs(val);
+                    const pct = maxVal > 0 ? absVal / maxVal : 0;
+                    const barH = Math.max(absVal > 0 ? 4 : 0, pct * chartH);
+                    const bx = gx + groupGap + si * barW;
+                    const by = PAD_TOP + chartH - barH;
+                    const fill = val < 0 ? 'rgba(252,129,74,0.9)' : (s_data[mi]?.color ?? '#6366f1');
+                    return absVal === 0 ? null : (
+                      <rect
+                        key={si}
+                        x={bx} y={by}
+                        width={barW - 2}
+                        height={barH}
+                        rx={3} ry={3}
+                        fill={fill}
+                        opacity={0.9}
+                        onMouseEnter={(e) => {
+                          const svg = (e.target as SVGElement).closest('svg');
+                          const rect = svg?.getBoundingClientRect();
+                          const svgW = rect?.width ?? W;
+                          const scaleX = svgW / W;
+                          setTooltip({
+                            x: (bx + barW / 2) * scaleX,
+                            y: by * (svgW / W) - 10,
+                            text: `${legend[si]?.label ?? ''}: ${val.toLocaleString('en', { maximumFractionDigits: 0 })}`,
+                          });
+                        }}
+                        onMouseLeave={() => setTooltip(null)}
+                      />
+                    );
+                  })}
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Tooltip */}
+          {tooltip && (
+            <div style={{
+              position: 'absolute',
+              left: tooltip.x,
+              top: tooltip.y,
+              transform: 'translate(-50%, -100%)',
+              background: '#111',
+              border: '1px solid #2a2a2a',
+              borderRadius: 6,
+              padding: '4px 8px',
+              fontSize: 11,
+              color: '#f1f1f1',
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              zIndex: 10,
+            }}>
+              {tooltip.text}
+            </div>
+          )}
+        </>
       )}
 
-      <div className="flex gap-4 mt-2">
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
         {legend.map(l => (
-          <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#555' }}>
+          <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#666' }}>
             <span style={{ display: 'inline-block', width: 10, height: 8, borderRadius: 2, background: l.color }} />
             {l.label}
           </span>
@@ -227,23 +262,57 @@ export default function DashboardPage() {
       .slice(0, 5)
       .map((p: any) => ({ ...p, client_name: clientMap[p.client_id] }));
 
-    const months = Array.from({ length: 12 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      return { key, label: d.toLocaleString('en', { month: 'short' }) };
-    });
-
+    // --- Smart month window: find actual data range, show at least 6 months ---
     const invDateKey = (i: any) =>
       toYearMonth(i.date) || toYearMonth(i.due_date) || toYearMonth(i.created_at);
     const expDateKey = (i: any) =>
       toYearMonth(i.date) || toYearMonth(i.created_at);
+
+    const allKeys = [
+      ...paidIncome.map(invDateKey),
+      ...expenseInvoices.map(expDateKey),
+    ].filter(Boolean);
+
+    // Build 12-month window always ending at current month
+    const endDate   = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 11, 1);
+
+    // If we have real data outside that window, expand the window
+    let windowStart = startDate;
+    let windowEnd   = endDate;
+    allKeys.forEach(k => {
+      const [y, m] = k.split('-').map(Number);
+      const d = new Date(y, m - 1, 1);
+      if (d < windowStart) windowStart = d;
+      if (d > windowEnd)   windowEnd   = d;
+    });
+
+    // Build months array from windowStart to windowEnd
+    const months: { key: string; label: string }[] = [];
+    const cur = new Date(windowStart);
+    while (cur <= windowEnd) {
+      const key   = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+      const label = cur.toLocaleString('en', { month: 'short' });
+      months.push({ key, label });
+      cur.setMonth(cur.getMonth() + 1);
+    }
+
+    // If less than 6 months total, pad to 6 by adding earlier months
+    while (months.length < 6) {
+      const first = months[0];
+      const [fy, fm] = first.key.split('-').map(Number);
+      const prev = new Date(fy, fm - 2, 1);
+      const key   = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+      const label = prev.toLocaleString('en', { month: 'short' });
+      months.unshift({ key, label });
+    }
 
     const revSeries: MonthBar[] = months.map(m => ({
       label: m.label,
       value: paidIncome
         .filter((i: any) => invDateKey(i) === m.key)
         .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
-      color: 'rgba(99,179,237,0.85)',
+      color: 'rgba(99,179,237,0.9)',
     }));
     const profSeries: MonthBar[] = months.map(m => {
       const rev = paidIncome
@@ -252,7 +321,7 @@ export default function DashboardPage() {
       const exp = expenseInvoices
         .filter((i: any) => expDateKey(i) === m.key)
         .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
-      return { label: m.label, value: rev - exp, color: 'rgba(72,187,120,0.85)' };
+      return { label: m.label, value: rev - exp, color: 'rgba(72,187,120,0.9)' };
     });
 
     const incomeSeries: MonthBar[] = months.map(m => ({
@@ -260,14 +329,14 @@ export default function DashboardPage() {
       value: paidIncome
         .filter((i: any) => invDateKey(i) === m.key)
         .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
-      color: 'rgba(99,179,237,0.85)',
+      color: 'rgba(99,179,237,0.9)',
     }));
     const expSeries: MonthBar[] = months.map(m => ({
       label: m.label,
       value: expenseInvoices
         .filter((i: any) => expDateKey(i) === m.key)
         .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
-      color: 'rgba(252,129,74,0.85)',
+      color: 'rgba(252,129,74,0.9)',
     }));
 
     const maxRev  = Math.max(...revSeries.map(b => b.value), ...profSeries.map(b => Math.abs(b.value)), 1) * 1.15;
@@ -298,7 +367,6 @@ export default function DashboardPage() {
       </div>
     );
 
-  // Shared card style
   const card = {
     background: '#1a1a1a',
     border: '1px solid #2a2a2a',
@@ -364,20 +432,20 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 14 }}>
+      {/* Charts — always 2 columns on wide, stack on narrow */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {[
           {
             title: 'Revenue & Profit',
             series: [stats.revSeries, stats.profSeries],
             maxVal: stats.maxRev,
-            legend: [{ label: 'Revenue', color: 'rgba(99,179,237,0.85)' }, { label: 'Profit', color: 'rgba(72,187,120,0.85)' }],
+            legend: [{ label: 'Revenue', color: 'rgba(99,179,237,0.9)' }, { label: 'Profit', color: 'rgba(72,187,120,0.9)' }],
           },
           {
             title: 'Cash Flow',
             series: [stats.incomeSeries, stats.expSeries],
             maxVal: stats.maxCash,
-            legend: [{ label: 'Income', color: 'rgba(99,179,237,0.85)' }, { label: 'Expenses', color: 'rgba(252,129,74,0.85)' }],
+            legend: [{ label: 'Income', color: 'rgba(99,179,237,0.9)' }, { label: 'Expenses', color: 'rgba(252,129,74,0.9)' }],
           },
         ].map(ch => (
           <div key={ch.title} style={{ ...card, padding: '18px 20px' }}>
