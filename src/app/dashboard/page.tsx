@@ -9,80 +9,121 @@ import {
 } from 'lucide-react';
 import { useCurrency } from '@/lib/currency-context';
 
-/* ─── tiny reusable bar chart ─────────────────────────────────────────────── */
-type BarSeries = { label: string; value: number; color: string }[];
+/* ─── robust date → "YYYY-MM" helper ─────────────────────────────────────── */
+function toYearMonth(raw: any): string {
+  if (!raw) return '';
+  if (typeof raw === 'string' && /^\d{4}-\d{2}/.test(raw)) return raw.slice(0, 7);
+  const d = new Date(raw);
+  if (!isNaN(d.getTime()))
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  if (typeof raw === 'string' && /^\d{1,2}\/\d{1,2}\/\d{4}/.test(raw)) {
+    const [, month, year] = raw.split('/');
+    return `${year}-${month.padStart(2, '0')}`;
+  }
+  return '';
+}
+
+/* ─── SVG bar chart ──────────────────────────────────────────────────── */
+type MonthBar = { label: string; value: number; color: string };
 
 function BarChart({
   months,
   series,
   maxVal,
-  height = 128,
   legend,
 }: {
   months: string[];
-  series: BarSeries[];
+  series: MonthBar[][];
   maxVal: number;
-  height?: number;
   legend: { label: string; color: string }[];
 }) {
-  const hasData = series.some(s => s.some(bar => Math.abs(bar.value) > 0));
-  const seriesCount = series.length;
+  const hasData = series.some(s => s.some(b => Math.abs(b.value) > 0));
+
+  const W = 600;
+  const H = 140;
+  const PAD_LEFT = 8;
+  const PAD_RIGHT = 8;
+  const PAD_BOTTOM = 22; // space for month labels
+  const PAD_TOP = 8;
+  const chartH = H - PAD_BOTTOM - PAD_TOP;
+  const chartW = W - PAD_LEFT - PAD_RIGHT;
+  const n = months.length;        // 12
+  const s = series.length;        // 2
+  const groupW = chartW / n;
+  const barW = Math.max(4, (groupW / s) * 0.72);
+  const groupGap = (groupW - barW * s) / 2;
 
   return (
     <div>
       {!hasData ? (
-        <div
-          className="flex items-center justify-center text-text-faint text-xs"
-          style={{ height }}
-        >
+        <div className="flex items-center justify-center text-text-faint text-xs" style={{ height: H }}>
           No data yet
         </div>
       ) : (
-        <div className="flex items-end gap-px" style={{ height }}>
-          {months.map((month, mi) => (
-            <div
-              key={mi}
-              className="flex-1 flex flex-col items-center"
-              style={{ height: '100%' }}
-            >
-              <div className="w-full flex-1 relative" style={{ minHeight: 0 }}>
-                {series.map((s, si) => {
-                  const val = s[mi]?.value ?? 0;
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          width="100%"
+          style={{ display: 'block', overflow: 'visible' }}
+          aria-hidden="true"
+        >
+          {/* faint horizontal grid lines */}
+          {[0.25, 0.5, 0.75, 1].map(f => (
+            <line
+              key={f}
+              x1={PAD_LEFT} y1={PAD_TOP + chartH * (1 - f)}
+              x2={PAD_LEFT + chartW} y2={PAD_TOP + chartH * (1 - f)}
+              stroke="currentColor" strokeOpacity={0.06} strokeWidth={1}
+            />
+          ))}
+
+          {months.map((month, mi) => {
+            const gx = PAD_LEFT + mi * groupW;
+            return (
+              <g key={mi}>
+                {/* month label */}
+                <text
+                  x={gx + groupW / 2}
+                  y={H - 4}
+                  textAnchor="middle"
+                  fontSize={9}
+                  fill="currentColor"
+                  opacity={0.4}
+                >
+                  {month}
+                </text>
+
+                {/* bars for each series */}
+                {series.map((s_data, si) => {
+                  const val = s_data[mi]?.value ?? 0;
                   const absVal = Math.abs(val);
-                  const pct = maxVal > 0 ? (absVal / maxVal) * 100 : 0;
-                  const left = si * (100 / seriesCount);
-                  const color = val < 0 ? 'rgba(252,129,74,0.85)' : s[mi]?.color;
+                  const pct = maxVal > 0 ? absVal / maxVal : 0;
+                  const barH = Math.max(2, pct * chartH);
+                  const bx = gx + groupGap + si * barW;
+                  const by = PAD_TOP + chartH - barH;
+                  // negative profit = orange-red
+                  const fill = val < 0 ? 'rgba(252,129,74,0.85)' : s_data[mi]?.color;
                   return (
-                    <div
+                    <rect
                       key={si}
-                      title={`${s[mi]?.label ?? month}: ${val.toFixed(0)}`}
-                      style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: `${left}%`,
-                        width: `${100 / seriesCount - 4}%`,
-                        height: pct > 0 ? `${pct}%` : '2px',
-                        minHeight: '2px',
-                        borderRadius: '2px 2px 0 0',
-                        background: color,
-                        opacity: pct > 0 ? 1 : 0.15,
-                        transition: 'height 0.4s ease',
-                      }}
-                    />
+                      x={bx} y={by}
+                      width={barW - 1}
+                      height={barH}
+                      rx={2} ry={2}
+                      fill={fill}
+                      opacity={absVal > 0 ? 1 : 0.15}
+                    >
+                      <title>{`${month}: ${val.toLocaleString('en', { maximumFractionDigits: 0 })}`}</title>
+                    </rect>
                   );
                 })}
-              </div>
-              <span
-                className="text-text-faint shrink-0 mt-1 text-center"
-                style={{ fontSize: '9px', lineHeight: 1.2 }}
-              >
-                {month}
-              </span>
-            </div>
-          ))}
-        </div>
+              </g>
+            );
+          })}
+        </svg>
       )}
-      <div className="flex gap-4 mt-3">
+
+      {/* legend */}
+      <div className="flex gap-4 mt-2">
         {legend.map(l => (
           <span key={l.label} className="flex items-center gap-1.5 text-text-faint text-xs">
             <span className="inline-block w-3 h-2 rounded-sm" style={{ background: l.color }} />
@@ -92,33 +133,6 @@ function BarChart({
       </div>
     </div>
   );
-}
-
-/* ─── robust date → "YYYY-MM" helper ─────────────────────────────────────── */
-/**
- * Converts ANY date string/value into a "YYYY-MM" key for chart bucketing.
- * Handles: ISO strings, timestamps, DD/MM/YYYY, MM/DD/YYYY, etc.
- * Falls back to empty string if unparseable.
- */
-function toYearMonth(raw: any): string {
-  if (!raw) return '';
-  // If it's already ISO-like "2026-05-..." just slice
-  if (typeof raw === 'string' && /^\d{4}-\d{2}/.test(raw)) {
-    return raw.slice(0, 7);
-  }
-  // Try native Date parse (handles timestamps, locale strings, etc.)
-  const d = new Date(raw);
-  if (!isNaN(d.getTime())) {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  }
-  // Try DD/MM/YYYY
-  if (typeof raw === 'string' && /^\d{1,2}\/\d{1,2}\/\d{4}/.test(raw)) {
-    const parts = raw.split('/');
-    const year = parts[2];
-    const month = parts[1].padStart(2, '0');
-    return `${year}-${month}`;
-  }
-  return '';
 }
 
 /* ─── dashboard page ──────────────────────────────────────────────────────── */
@@ -219,35 +233,43 @@ export default function DashboardPage() {
       return { key, label: d.toLocaleString('en', { month: 'short' }) };
     });
 
-    // FIX: use robust toYearMonth() instead of brittle .slice(0,7)
-    // Also fall back chain: date → due_date → created_at
     const invDateKey = (i: any) =>
       toYearMonth(i.date) || toYearMonth(i.due_date) || toYearMonth(i.created_at);
     const expDateKey = (i: any) =>
       toYearMonth(i.date) || toYearMonth(i.created_at);
 
-    // Revenue & Profit
-    const revSeries: BarSeries = months.map(m => ({
+    // Revenue & Profit series
+    const revSeries: MonthBar[] = months.map(m => ({
       label: m.label,
-      value: paidIncome.filter((i: any) => invDateKey(i) === m.key).reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
-      color: 'rgba(99,179,237,0.8)',
+      value: paidIncome
+        .filter((i: any) => invDateKey(i) === m.key)
+        .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
+      color: 'rgba(99,179,237,0.85)',
     }));
-    const profSeries: BarSeries = months.map(m => {
-      const rev = paidIncome.filter((i: any) => invDateKey(i) === m.key).reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
-      const exp = expenseInvoices.filter((i: any) => expDateKey(i) === m.key).reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
-      return { label: m.label, value: rev - exp, color: 'rgba(72,187,120,0.8)' };
+    const profSeries: MonthBar[] = months.map(m => {
+      const rev = paidIncome
+        .filter((i: any) => invDateKey(i) === m.key)
+        .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
+      const exp = expenseInvoices
+        .filter((i: any) => expDateKey(i) === m.key)
+        .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0);
+      return { label: m.label, value: rev - exp, color: 'rgba(72,187,120,0.85)' };
     });
 
-    // Cash Flow
-    const incomeSeries: BarSeries = months.map(m => ({
+    // Cash Flow series
+    const incomeSeries: MonthBar[] = months.map(m => ({
       label: m.label,
-      value: paidIncome.filter((i: any) => invDateKey(i) === m.key).reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
-      color: 'rgba(99,179,237,0.8)',
+      value: paidIncome
+        .filter((i: any) => invDateKey(i) === m.key)
+        .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
+      color: 'rgba(99,179,237,0.85)',
     }));
-    const expSeries: BarSeries = months.map(m => ({
+    const expSeries: MonthBar[] = months.map(m => ({
       label: m.label,
-      value: expenseInvoices.filter((i: any) => expDateKey(i) === m.key).reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
-      color: 'rgba(252,129,74,0.8)',
+      value: expenseInvoices
+        .filter((i: any) => expDateKey(i) === m.key)
+        .reduce((s: number, i: any) => s + conv(i.total ?? i.amount, i.currency), 0),
+      color: 'rgba(252,129,74,0.85)',
     }));
 
     const maxRev  = Math.max(...revSeries.map(b => b.value), ...profSeries.map(b => Math.abs(b.value)), 1) * 1.15;
@@ -330,10 +352,9 @@ export default function DashboardPage() {
             months={stats.months}
             series={[stats.revSeries, stats.profSeries]}
             maxVal={stats.maxRev}
-            height={128}
             legend={[
-              { label: 'Revenue', color: 'rgba(99,179,237,0.8)' },
-              { label: 'Profit',  color: 'rgba(72,187,120,0.8)' },
+              { label: 'Revenue', color: 'rgba(99,179,237,0.85)' },
+              { label: 'Profit',  color: 'rgba(72,187,120,0.85)' },
             ]}
           />
         </div>
@@ -343,10 +364,9 @@ export default function DashboardPage() {
             months={stats.months}
             series={[stats.incomeSeries, stats.expSeries]}
             maxVal={stats.maxCash}
-            height={128}
             legend={[
-              { label: 'Income',   color: 'rgba(99,179,237,0.8)' },
-              { label: 'Expenses', color: 'rgba(252,129,74,0.8)' },
+              { label: 'Income',   color: 'rgba(99,179,237,0.85)' },
+              { label: 'Expenses', color: 'rgba(252,129,74,0.85)' },
             ]}
           />
         </div>
