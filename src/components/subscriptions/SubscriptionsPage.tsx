@@ -26,6 +26,19 @@ interface Subscription {
   created_at: string;
 }
 
+// Exchange rates to SAR (approximate fixed rates)
+const TO_SAR: Record<string, number> = {
+  SAR: 1,
+  USD: 3.75,
+  EUR: 4.10,
+  GBP: 4.75,
+  AED: 1.02,
+};
+
+function toSAR(amount: number, currency: string): number {
+  return amount * (TO_SAR[currency] ?? 1);
+}
+
 const CATEGORY_META: Record<Category, { label: string; icon: React.ElementType; color: string }> = {
   hosting: { label: 'Hosting', icon: Server, color: 'text-blue-400 bg-blue-400/10' },
   domain:  { label: 'Domain',  icon: Globe,  color: 'text-purple-400 bg-purple-400/10' },
@@ -53,8 +66,9 @@ function daysUntil(dateStr: string) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-function toYearly(cost: number, cycle: BillingCycle) {
-  return cycle === 'monthly' ? cost * 12 : cost;
+function toYearlySAR(cost: number, currency: string, cycle: BillingCycle): number {
+  const sarAmount = toSAR(cost, currency);
+  return cycle === 'monthly' ? sarAmount * 12 : sarAmount;
 }
 
 export function SubscriptionsPage() {
@@ -82,9 +96,14 @@ export function SubscriptionsPage() {
   useEffect(() => { load(); }, []);
 
   const activeSubs = useMemo(() => subs.filter(s => s.status === 'active'), [subs]);
-  const totalYearly = useMemo(() =>
-    activeSubs.reduce((sum, s) => sum + toYearly(s.cost, s.billing_cycle), 0), [activeSubs]);
-  const totalMonthly = useMemo(() => totalYearly / 12, [totalYearly]);
+
+  // All costs converted to SAR for the stats cards
+  const totalYearlySAR = useMemo(() =>
+    activeSubs.reduce((sum, s) => sum + toYearlySAR(s.cost, s.currency, s.billing_cycle), 0),
+    [activeSubs]
+  );
+  const totalMonthlySAR = useMemo(() => totalYearlySAR / 12, [totalYearlySAR]);
+
   const expiringSoon = useMemo(() =>
     activeSubs.filter(s => daysUntil(s.renewal_date) <= 30), [activeSubs]);
 
@@ -173,13 +192,13 @@ export function SubscriptionsPage() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Stats — all values converted to SAR */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Monthly Cost',   value: `SAR ${f(totalMonthly)}`, sub: 'active subs',       icon: TrendingUp,    color: 'bg-accent/10 text-accent' },
-          { label: 'Yearly Cost',    value: `SAR ${f(totalYearly)}`,  sub: 'total per year',    icon: TrendingUp,    color: 'bg-primary/10 text-primary' },
-          { label: 'Active',         value: String(activeSubs.length), sub: 'subscriptions',    icon: CheckCircle,   color: 'bg-blue-400/10 text-blue-400' },
-          { label: 'Expiring Soon',  value: String(expiringSoon.length), sub: 'within 30 days', icon: AlertTriangle, color: expiringSoon.length > 0 ? 'bg-amber-400/10 text-amber-400' : 'bg-surface2 text-text-muted' },
+          { label: 'Monthly Cost',   value: `SAR ${f(totalMonthlySAR)}`, sub: 'converted to SAR',    icon: TrendingUp,    color: 'bg-accent/10 text-accent' },
+          { label: 'Yearly Cost',    value: `SAR ${f(totalYearlySAR)}`,  sub: 'converted to SAR',    icon: TrendingUp,    color: 'bg-primary/10 text-primary' },
+          { label: 'Active',         value: String(activeSubs.length),   sub: 'subscriptions',        icon: CheckCircle,   color: 'bg-blue-400/10 text-blue-400' },
+          { label: 'Expiring Soon',  value: String(expiringSoon.length), sub: 'within 30 days',       icon: AlertTriangle, color: expiringSoon.length > 0 ? 'bg-amber-400/10 text-amber-400' : 'bg-surface2 text-text-muted' },
         ].map(stat => (
           <div key={stat.label} className="bg-surface border border-border rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -191,6 +210,16 @@ export function SubscriptionsPage() {
           </div>
         ))}
       </div>
+
+      {/* Exchange Rate Notice — shown when any active sub is non-SAR */}
+      {activeSubs.some(s => s.currency !== 'SAR') && (
+        <div className="bg-blue-400/10 border border-blue-400/20 rounded-xl p-3 flex items-center gap-2">
+          <span className="text-blue-400 text-xs font-medium">ℹ️</span>
+          <p className="text-text-muted text-xs">
+            Stats are converted to SAR using fixed rates: 1 USD = 3.75 SAR · 1 EUR = 4.10 SAR · 1 GBP = 4.75 SAR
+          </p>
+        </div>
+      )}
 
       {/* Expiring Banner */}
       {expiringSoon.length > 0 && (
@@ -233,14 +262,14 @@ export function SubscriptionsPage() {
           <div className="text-center py-16">
             <Package size={32} className="text-text-faint mx-auto mb-3" />
             <p className="text-text-muted text-sm">No subscriptions yet</p>
-            <p className="text-text-faint text-xs mt-1">Click "Add Subscription" to get started</p>
+            <p className="text-text-faint text-xs mt-1">Click &quot;Add Subscription&quot; to get started</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {['Name', 'Category', 'Cost', 'Billing', 'Renewal', 'Status', ''].map(h => (
+                  {['Name', 'Category', 'Cost', 'SAR Equiv.', 'Billing', 'Renewal', 'Status', ''].map(h => (
                     <th key={h} className="text-left text-text-faint font-medium text-xs px-4 py-3">{h}</th>
                   ))}
                 </tr>
@@ -250,6 +279,8 @@ export function SubscriptionsPage() {
                   const days = daysUntil(s.renewal_date);
                   const CatIcon = CATEGORY_META[s.category].icon;
                   const StatIcon = STATUS_META[s.status].icon;
+                  const sarEquiv = toSAR(s.cost, s.currency);
+                  const sarYearly = toYearlySAR(s.cost, s.currency, s.billing_cycle);
                   return (
                     <tr key={s.id} className="border-b border-border/50 hover:bg-surface2 transition-colors">
                       <td className="px-4 py-3">
@@ -269,7 +300,19 @@ export function SubscriptionsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-text-primary text-sm tabular-nums">{s.currency} {s.cost.toLocaleString()}</p>
-                        <p className="text-text-faint text-xs tabular-nums">{s.currency} {f(toYearly(s.cost, s.billing_cycle))}/yr</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        {s.currency !== 'SAR' ? (
+                          <>
+                            <p className="font-medium text-text-primary text-sm tabular-nums">SAR {f(sarEquiv)}</p>
+                            <p className="text-text-faint text-xs tabular-nums">SAR {f(sarYearly)}/yr</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-medium text-text-primary text-sm tabular-nums">SAR {f(sarEquiv)}</p>
+                            <p className="text-text-faint text-xs tabular-nums">SAR {f(sarYearly)}/yr</p>
+                          </>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-text-muted text-sm capitalize">{s.billing_cycle}</td>
                       <td className="px-4 py-3">
@@ -368,12 +411,24 @@ export function SubscriptionsPage() {
                     onChange={e => setForm(p => ({...p, currency: e.target.value}))}
                     className={inputCls}
                   >
-                    <option value="SAR">SAR</option>
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
+                    <option value="SAR">SAR 🇸🇦</option>
+                    <option value="USD">USD 🇺🇸</option>
+                    <option value="EUR">EUR 🇪🇺</option>
+                    <option value="GBP">GBP 🇬🇧</option>
+                    <option value="AED">AED 🇦🇪</option>
                   </select>
                 </div>
               </div>
+
+              {/* SAR preview when non-SAR selected */}
+              {form.currency !== 'SAR' && form.cost && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                  <p className="text-primary text-xs">
+                    ≈ SAR {f(toSAR(parseFloat(form.cost) || 0, form.currency))} at current rate
+                    {form.billing_cycle === 'monthly' && ` · SAR ${f(toSAR(parseFloat(form.cost) || 0, form.currency) * 12)}/yr`}
+                  </p>
+                </div>
+              )}
 
               {/* Billing + Renewal */}
               <div className="grid grid-cols-2 gap-3">
