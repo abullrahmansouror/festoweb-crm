@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useCurrency } from '@/lib/currency-context';
 import {
   Plus, Pencil, Trash2, Globe, Server, Wrench, Package,
   TrendingUp, AlertTriangle, CheckCircle, PauseCircle, X, Loader2, RefreshCw
@@ -25,18 +26,6 @@ interface Subscription {
   notes?: string;
   created_at: string;
 }
-
-// Fallback fixed rates if API fails
-const FALLBACK_RATES: Record<string, number> = {
-  SAR: 1,
-  USD: 3.75,
-  EUR: 4.10,
-  GBP: 4.75,
-  AED: 1.02,
-  MAD: 0.37,
-};
-
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'AED', 'MAD'];
 
 const CATEGORY_META: Record<Category, { label: string; icon: React.ElementType; color: string }> = {
   hosting: { label: 'Hosting', icon: Server, color: 'text-blue-400 bg-blue-400/10' },
@@ -67,6 +56,7 @@ function daysUntil(dateStr: string) {
 
 export function SubscriptionsPage() {
   const supabase = createClient();
+  const { convert, fmt, currency, rates, ratesReady, ratesLoading, ratesError, refreshRates } = useCurrency() as any;
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -76,53 +66,7 @@ export function SubscriptionsPage() {
   const [error, setError] = useState('');
   const [filterCat, setFilterCat] = useState<Category | 'all'>('all');
 
-  // Live exchange rates state
-  const [rates, setRates] = useState<Record<string, number>>(FALLBACK_RATES);
-  const [ratesLoading, setRatesLoading] = useState(false);
-  const [ratesUpdatedAt, setRatesUpdatedAt] = useState<string | null>(null);
-  const [ratesError, setRatesError] = useState(false);
-
-  const fetchRates = useCallback(async () => {
-    setRatesLoading(true);
-    setRatesError(false);
-    try {
-      // open.er-api.com — free, no key, full CORS support
-      const res = await fetch('https://open.er-api.com/v6/latest/SAR');
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
-      if (data.result !== 'success') throw new Error('API error');
-
-      // data.rates = { USD: 0.266..., EUR: 0.244..., ... } (1 SAR = X foreign)
-      // We need TO_SAR: 1 foreign = X SAR → invert
-      const toSarRates: Record<string, number> = { SAR: 1 };
-      for (const cur of CURRENCIES) {
-        if (data.rates[cur]) {
-          toSarRates[cur] = 1 / data.rates[cur];
-        }
-      }
-      setRates(toSarRates);
-      setRatesUpdatedAt(new Date().toLocaleTimeString('en-SA', { hour: '2-digit', minute: '2-digit' }));
-    } catch {
-      setRatesError(true);
-      setRates(FALLBACK_RATES);
-    } finally {
-      setRatesLoading(false);
-    }
-  }, []);
-
-  // Fetch rates on mount
-  useEffect(() => { fetchRates(); }, [fetchRates]);
-
-  function toSAR(amount: number, currency: string): number {
-    return amount * (rates[currency] ?? FALLBACK_RATES[currency] ?? 1);
-  }
-
-  function toYearlySAR(cost: number, currency: string, cycle: BillingCycle): number {
-    const sarAmount = toSAR(cost, currency);
-    return cycle === 'monthly' ? sarAmount * 12 : sarAmount;
-  }
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const { data, error: err } = await supabase
       .from('subscriptions')
@@ -131,9 +75,25 @@ export function SubscriptionsPage() {
     if (err) console.error('load error:', err);
     setSubs(data ?? []);
     setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function toSAR(amount: number, fromCurrency: string): number {
+    // Use global convert() which already handles rate lookup
+    // convert() returns in the active display currency — we need SAR specifically
+    // so we temporarily compute: amount * rate[fromCurrency]
+    const FALLBACK_RATES: Record<string, number> = {
+      SAR: 1, USD: 3.75, EUR: 4.10, GBP: 4.75, AED: 1.02, MAD: 0.37,
+    };
+    const rate = (rates ?? FALLBACK_RATES)[fromCurrency] ?? FALLBACK_RATES[fromCurrency] ?? 1;
+    return amount * rate;
   }
 
-  useEffect(() => { load(); }, []);
+  function toYearlySAR(cost: number, fromCurrency: string, cycle: BillingCycle): number {
+    const sarAmount = toSAR(cost, fromCurrency);
+    return cycle === 'monthly' ? sarAmount * 12 : sarAmount;
+  }
 
   const activeSubs = useMemo(() => subs.filter(s => s.status === 'active'), [subs]);
 
@@ -263,26 +223,25 @@ export function SubscriptionsPage() {
           <div className="flex-1">
             {ratesError ? (
               <p className="text-text-muted text-xs">Using fallback rates · Could not reach exchange API</p>
-            ) : ratesLoading ? (
+            ) : !ratesReady ? (
               <p className="text-text-muted text-xs">Fetching live rates...</p>
             ) : (
               <p className="text-text-muted text-xs">
                 <span className="text-blue-400 font-medium">Live rates</span>
                 {' · '}
-                {Object.entries(rates).filter(([k]) => k !== 'SAR').map(([cur, rate]) =>
-                  `1 ${cur} = SAR ${f2(rate)}`
+                {Object.entries(rates ?? {}).filter(([k]) => k !== 'SAR').slice(0, 5).map(([cur, rate]) =>
+                  `1 ${cur} = SAR ${f2(rate as number)}`
                 ).join(' · ')}
-                {ratesUpdatedAt && <span className="text-text-faint"> · Updated {ratesUpdatedAt}</span>}
               </p>
             )}
           </div>
           <button
-            onClick={fetchRates}
-            disabled={ratesLoading}
+            onClick={refreshRates}
+            disabled={!ratesReady}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface2 transition-colors"
             title="Refresh rates"
           >
-            <RefreshCw size={13} className={ratesLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={13} className={!ratesReady ? 'animate-spin' : ''} />
           </button>
         </div>
       )}

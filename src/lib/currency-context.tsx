@@ -68,22 +68,24 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Convert any amount from `fromCurrency` => active main currency
+  // rates[X] = "1 X = N SAR" (already inverted from API)
   const convert = useCallback((amount: number, fromCurrency: string = 'SAR'): number => {
     if (!amount || isNaN(amount)) return 0;
     const cur = (fromCurrency || 'SAR').toUpperCase();
     const toSarRate = rates[cur] ?? FALLBACK[cur] ?? 1;
     const inSar = amount * toSarRate;
     if (currency === 'SAR') return inSar;
-    // SAR -> MAD
-    const sarToMad = rates['MAD'] ? 1 / rates['MAD'] : 1 / FALLBACK['MAD'];
-    return inSar * sarToMad;
+    // SAR -> MAD: rates['MAD'] = "1 MAD = N SAR", so MAD = SAR / N
+    const madRate = rates['MAD'] ?? FALLBACK['MAD'];
+    return inSar / madRate;
   }, [currency, rates]);
 
+  // Bug fix: maximumFractionDigits should equal `decimals`, not always 2
   const fmt = useCallback((n: number, decimals = 0): string => {
     const safe = isNaN(n) || !isFinite(n) ? 0 : n;
     return `${currency} ${safe.toLocaleString('en', {
       minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals > 0 ? decimals : 2,
+      maximumFractionDigits: decimals,
     })}`;
   }, [currency]);
 

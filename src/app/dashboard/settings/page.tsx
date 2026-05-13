@@ -1,25 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, Building2, Bell, DollarSign, Check } from 'lucide-react';
 import { useCurrency, MainCurrency } from '@/lib/currency-context';
 
 const inputCls = 'w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary transition-colors';
 const labelCls = 'text-text-muted text-xs mb-1 block';
 
+const DEFAULT_FORM = {
+  agency_name: 'Festoweb',
+  owner_name: 'Abdulrhman',
+  email: 'contact@festoweb.com',
+  phone: '+966-5XX-XXXXX',
+  notifications_email: true,
+  notifications_followup: true,
+};
+
 export default function SettingsPage() {
   const { currency, setCurrency } = useCurrency();
   const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState({
-    agency_name: 'Festoweb',
-    owner_name: 'Abdulrhman',
-    email: 'contact@festoweb.com',
-    phone: '+966-5XX-XXXXX',
-    notifications_email: true,
-    notifications_followup: true,
-  });
+  const [form, setForm] = useState(DEFAULT_FORM);
+
+  // Restore persisted settings on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('crm_settings');
+      if (stored) setForm({ ...DEFAULT_FORM, ...JSON.parse(stored) });
+    } catch {}
+  }, []);
 
   const handleSave = () => {
+    try {
+      localStorage.setItem('crm_settings', JSON.stringify(form));
+    } catch {}
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };

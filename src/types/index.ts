@@ -2,7 +2,7 @@ export type PipelineStage = 'lead' | 'discovery_call' | 'deal_in_meeting' | 'pai
 export type ServiceType = 'website_design' | 'website_redesign' | 'landing_page' | 'maintenance' | 'ecommerce';
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
-export type InvoiceStatus = 'pending' | 'paid' | 'overdue';
+export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue';
 export type TeamRole = 'owner' | 'developer' | 'designer' | 'sales';
 
 export interface Client {
@@ -52,12 +52,17 @@ export interface PipelineCard {
 export interface Invoice {
   id: string;
   client_name: string;
+  client_email?: string;
+  client_phone?: string;
   amount: number;
+  tax_rate?: number;
+  currency?: string;
   type: 'income' | 'expense';
   status: InvoiceStatus;
   description?: string;
   date: string;
   due_date?: string;
+  note?: string;
 }
 
 export interface Task {

@@ -12,23 +12,23 @@ export function InvoiceModal({
   onClose,
 }: {
   invoice: Invoice | null;
-  onSave: (i: any) => void;
+  onSave: (i: Partial<Invoice> & { id: string }) => void;
   onClose: () => void;
 }) {
   const { register, handleSubmit, watch } = useForm({
     defaultValues: {
       client_name:  invoice?.client_name  || '',
-      client_email: (invoice as any)?.client_email || '',
-      client_phone: (invoice as any)?.client_phone || '',
+      client_email: invoice?.client_email || '',
+      client_phone: invoice?.client_phone || '',
       description:  invoice?.description  || '',
       amount:       invoice?.amount       || 0,
-      tax_rate:     (invoice as any)?.tax_rate     || 0,
-      currency:     (invoice as any)?.currency     || 'SAR',
+      tax_rate:     invoice?.tax_rate     || 0,
+      currency:     invoice?.currency     || 'SAR',
       type:         invoice?.type         || 'income',
-      status:       (invoice?.status as any) || 'Draft',
+      status:       invoice?.status       || 'Draft',
       date:         invoice?.date         || new Date().toISOString().slice(0, 10),
       due_date:     invoice?.due_date     || '',
-      note:         (invoice as any)?.note || '',
+      note:         invoice?.note         || '',
     },
   });
 
@@ -38,8 +38,8 @@ export function InvoiceModal({
   const taxAmt   = (amount * taxRate) / 100;
   const total    = amount + taxAmt;
 
-  const onSubmit = (data: any) =>
-    onSave({ ...data, id: invoice?.id || '' });
+  const onSubmit = (data: Partial<Invoice>) =>
+    onSave({ ...data, id: invoice?.id || '' } as Partial<Invoice> & { id: string });
 
   const inputCls =
     'w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary';
