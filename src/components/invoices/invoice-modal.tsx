@@ -67,10 +67,12 @@ export function InvoiceModal({ invoice, onClose, onSave }: { invoice: any; onClo
             </select>
             <select value={form.currency} onChange={e => setForm({...form, currency: e.target.value})}
               className="bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-primary">
-              <option value="SAR">SAR</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="AED">AED</option>
+              <option value="SAR">SAR 🇸🇦</option>
+              <option value="USD">USD 🇺🇸</option>
+              <option value="EUR">EUR 🇪🇺</option>
+              <option value="AED">AED 🇦🇪</option>
+              <option value="GBP">GBP 🇬🇧</option>
+              <option value="MAD">MAD 🇲🇦</option>
             </select>
             <div className="flex items-center gap-2">
               <label className="text-xs text-text-muted whitespace-nowrap">VAT %</label>

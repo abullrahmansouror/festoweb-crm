@@ -33,6 +33,7 @@ const TO_SAR: Record<string, number> = {
   EUR: 4.10,
   GBP: 4.75,
   AED: 1.02,
+  MAD: 0.37,
 };
 
 function toSAR(amount: number, currency: string): number {
@@ -97,7 +98,6 @@ export function SubscriptionsPage() {
 
   const activeSubs = useMemo(() => subs.filter(s => s.status === 'active'), [subs]);
 
-  // All costs converted to SAR for the stats cards
   const totalYearlySAR = useMemo(() =>
     activeSubs.reduce((sum, s) => sum + toYearlySAR(s.cost, s.currency, s.billing_cycle), 0),
     [activeSubs]
@@ -192,7 +192,7 @@ export function SubscriptionsPage() {
         </button>
       </div>
 
-      {/* Stats — all values converted to SAR */}
+      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Monthly Cost',   value: `SAR ${f(totalMonthlySAR)}`, sub: 'converted to SAR',    icon: TrendingUp,    color: 'bg-accent/10 text-accent' },
@@ -211,12 +211,12 @@ export function SubscriptionsPage() {
         ))}
       </div>
 
-      {/* Exchange Rate Notice — shown when any active sub is non-SAR */}
+      {/* Exchange Rate Notice */}
       {activeSubs.some(s => s.currency !== 'SAR') && (
         <div className="bg-blue-400/10 border border-blue-400/20 rounded-xl p-3 flex items-center gap-2">
           <span className="text-blue-400 text-xs font-medium">ℹ️</span>
           <p className="text-text-muted text-xs">
-            Stats are converted to SAR using fixed rates: 1 USD = 3.75 SAR · 1 EUR = 4.10 SAR · 1 GBP = 4.75 SAR
+            Stats are converted to SAR using fixed rates: 1 USD = 3.75 · 1 EUR = 4.10 · 1 GBP = 4.75 · 1 AED = 1.02 · 1 MAD = 0.37
           </p>
         </div>
       )}
@@ -302,17 +302,8 @@ export function SubscriptionsPage() {
                         <p className="font-medium text-text-primary text-sm tabular-nums">{s.currency} {s.cost.toLocaleString()}</p>
                       </td>
                       <td className="px-4 py-3">
-                        {s.currency !== 'SAR' ? (
-                          <>
-                            <p className="font-medium text-text-primary text-sm tabular-nums">SAR {f(sarEquiv)}</p>
-                            <p className="text-text-faint text-xs tabular-nums">SAR {f(sarYearly)}/yr</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-medium text-text-primary text-sm tabular-nums">SAR {f(sarEquiv)}</p>
-                            <p className="text-text-faint text-xs tabular-nums">SAR {f(sarYearly)}/yr</p>
-                          </>
-                        )}
+                        <p className="font-medium text-text-primary text-sm tabular-nums">SAR {f(sarEquiv)}</p>
+                        <p className="text-text-faint text-xs tabular-nums">SAR {f(sarYearly)}/yr</p>
                       </td>
                       <td className="px-4 py-3 text-text-muted text-sm capitalize">{s.billing_cycle}</td>
                       <td className="px-4 py-3">
@@ -351,7 +342,6 @@ export function SubscriptionsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)} />
           <div className="relative bg-surface border border-border rounded-xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
             <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-surface z-10">
               <h2 className="font-semibold text-text-primary">{editing ? 'Edit Subscription' : 'Add Subscription'}</h2>
               <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface2 transition-colors">
@@ -364,7 +354,6 @@ export function SubscriptionsPage() {
                 <p className="text-red-400 text-xs bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">{error}</p>
               )}
 
-              {/* Name */}
               <div>
                 <label className={labelCls}>Name *</label>
                 <input
@@ -375,7 +364,6 @@ export function SubscriptionsPage() {
                 />
               </div>
 
-              {/* Category */}
               <div>
                 <label className={labelCls}>Category *</label>
                 <select
@@ -390,7 +378,6 @@ export function SubscriptionsPage() {
                 </select>
               </div>
 
-              {/* Cost + Currency */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Cost *</label>
@@ -416,11 +403,11 @@ export function SubscriptionsPage() {
                     <option value="EUR">EUR 🇪🇺</option>
                     <option value="GBP">GBP 🇬🇧</option>
                     <option value="AED">AED 🇦🇪</option>
+                    <option value="MAD">MAD 🇲🇦</option>
                   </select>
                 </div>
               </div>
 
-              {/* SAR preview when non-SAR selected */}
               {form.currency !== 'SAR' && form.cost && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
                   <p className="text-primary text-xs">
@@ -430,7 +417,6 @@ export function SubscriptionsPage() {
                 </div>
               )}
 
-              {/* Billing + Renewal */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Billing Cycle</label>
@@ -454,7 +440,6 @@ export function SubscriptionsPage() {
                 </div>
               </div>
 
-              {/* Status */}
               <div>
                 <label className={labelCls}>Status</label>
                 <select
@@ -468,7 +453,6 @@ export function SubscriptionsPage() {
                 </select>
               </div>
 
-              {/* Website */}
               <div>
                 <label className={labelCls}>Website</label>
                 <input
@@ -479,7 +463,6 @@ export function SubscriptionsPage() {
                 />
               </div>
 
-              {/* Notes */}
               <div>
                 <label className={labelCls}>Notes</label>
                 <textarea
@@ -491,7 +474,6 @@ export function SubscriptionsPage() {
                 />
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3 pt-1">
                 <button
                   type="button"
