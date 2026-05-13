@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, GitBranch, DollarSign, BarChart2, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, GitBranch, DollarSign, BarChart2, Settings, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/clients', icon: Users, label: 'Clients' },
   { href: '/dashboard/pipeline', icon: GitBranch, label: 'Pipeline' },
   { href: '/dashboard/finance', icon: DollarSign, label: 'Finance' },
+  { href: '/dashboard/subscriptions', icon: CreditCard, label: 'Subscriptions' },
   { href: '/dashboard/reports', icon: BarChart2, label: 'Reports' },
 ];
 
