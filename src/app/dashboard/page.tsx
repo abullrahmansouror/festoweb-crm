@@ -56,7 +56,7 @@ function BarChart({
     <div style={{ position: 'relative' }}>
       {!hasData ? (
         <div
-          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, height: H, color: '#555' }}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, height: H, color: '#444' }}
         >
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <rect x="3" y="12" width="4" height="9" rx="1"/>
@@ -74,7 +74,6 @@ function BarChart({
             aria-hidden="true"
             onMouseLeave={() => setTooltip(null)}
           >
-            {/* Subtle grid lines */}
             {[0.25, 0.5, 0.75, 1].map(f => (
               <line
                 key={f}
@@ -88,7 +87,6 @@ function BarChart({
               const gx = PAD_LEFT + mi * groupW;
               return (
                 <g key={mi}>
-                  {/* Month label */}
                   <text
                     x={gx + groupW / 2}
                     y={H - 8}
@@ -136,7 +134,6 @@ function BarChart({
             })}
           </svg>
 
-          {/* Tooltip */}
           {tooltip && (
             <div style={{
               position: 'absolute',
@@ -159,7 +156,6 @@ function BarChart({
         </>
       )}
 
-      {/* Legend */}
       <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
         {legend.map(l => (
           <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#666' }}>
@@ -175,7 +171,7 @@ function BarChart({
 export default function DashboardPage() {
   const supabase = createClient();
   const { fmt, convert, currency } = useCurrency();
-  const [userName, setUserName] = useState('there');
+  const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(true);
 
   const [rawInvoices,   setRawInvoices]   = useState<any[]>([]);
@@ -186,11 +182,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      const name =
+      const raw =
         data.user?.user_metadata?.full_name ||
+        data.user?.user_metadata?.name ||
         data.user?.email?.split('@')[0] ||
-        'there';
-      setUserName(name.charAt(0).toUpperCase() + name.slice(1));
+        '';
+      // Capitalize first letter only, preserve rest
+      const name = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'there';
+      setUserName(name);
     });
   }, []);
 
@@ -262,7 +261,6 @@ export default function DashboardPage() {
       .slice(0, 5)
       .map((p: any) => ({ ...p, client_name: clientMap[p.client_id] }));
 
-    // --- Smart month window: find actual data range, show at least 6 months ---
     const invDateKey = (i: any) =>
       toYearMonth(i.date) || toYearMonth(i.due_date) || toYearMonth(i.created_at);
     const expDateKey = (i: any) =>
@@ -273,11 +271,9 @@ export default function DashboardPage() {
       ...expenseInvoices.map(expDateKey),
     ].filter(Boolean);
 
-    // Build 12-month window always ending at current month
     const endDate   = new Date(now.getFullYear(), now.getMonth(), 1);
     const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 11, 1);
 
-    // If we have real data outside that window, expand the window
     let windowStart = startDate;
     let windowEnd   = endDate;
     allKeys.forEach(k => {
@@ -287,7 +283,6 @@ export default function DashboardPage() {
       if (d > windowEnd)   windowEnd   = d;
     });
 
-    // Build months array from windowStart to windowEnd
     const months: { key: string; label: string }[] = [];
     const cur = new Date(windowStart);
     while (cur <= windowEnd) {
@@ -297,7 +292,6 @@ export default function DashboardPage() {
       cur.setMonth(cur.getMonth() + 1);
     }
 
-    // If less than 6 months total, pad to 6 by adding earlier months
     while (months.length < 6) {
       const first = months[0];
       const [fy, fm] = first.key.split('-').map(Number);
@@ -367,73 +361,100 @@ export default function DashboardPage() {
       </div>
     );
 
-  const card = {
+  const card: React.CSSProperties = {
     background: '#1a1a1a',
-    border: '1px solid #2a2a2a',
-    borderRadius: 12,
-    padding: '16px 18px',
+    border: '1px solid #252525',
+    borderRadius: 14,
+    padding: '18px 20px',
   };
 
+  const kpiCards = [
+    [
+      { label: 'Total Revenue',        value: fmt(stats.totalRevenue),  sub: `${stats.paidCount} paid invoice${stats.paidCount !== 1 ? 's' : ''}`,  Icon: DollarSign,   accent: '#10b981' },
+      { label: 'Total Profit',         value: fmt(stats.totalProfit),   sub: 'After expenses',                    Icon: TrendingUp,   accent: stats.totalProfit >= 0 ? '#10b981' : '#ef4444' },
+      { label: 'Total Expenses',       value: fmt(stats.totalExpenses), sub: 'From expense invoices',             Icon: TrendingDown, accent: '#ef4444' },
+      { label: 'Outstanding Invoices', value: fmt(stats.outstanding),   sub: `${stats.outstandingCount} unpaid`,  Icon: AlertCircle,  accent: '#f59e0b' },
+    ],
+    [
+      { label: 'Monthly Recurring',  value: fmt(stats.monthlyRecurring), sub: new Date().toLocaleString('en', { month: 'long' }), Icon: DollarSign,  accent: '#6366f1' },
+      { label: 'Active Projects',    value: String(stats.activeProjects),    sub: 'In pipeline', Icon: Briefcase,   accent: '#60a5fa' },
+      { label: 'Completed Projects', value: String(stats.completedProjects), sub: 'Deals won',   Icon: CheckCircle, accent: '#10b981' },
+      { label: 'Total Clients',      value: String(totalClients),            sub: `${totalClients} registered`, Icon: Users, accent: '#c084fc' },
+    ],
+  ] as const;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* Header */}
-      <div>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f1f1' }}>Dashboard</h1>
-        <p style={{ color: '#a0a0a0', fontSize: 13, marginTop: 4 }}>
+      <div style={{ marginBottom: 4 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f1f1', lineHeight: 1.2 }}>Dashboard</h1>
+        <p style={{ color: '#777', fontSize: 13, marginTop: 5, display: 'flex', alignItems: 'center', gap: 8 }}>
           Welcome back, {userName} 👋
           <span style={{
-            marginLeft: 8, fontSize: 11, color: '#555',
-            background: '#222', border: '1px solid #2a2a2a',
-            padding: '2px 8px', borderRadius: 999
+            fontSize: 11, color: '#888',
+            background: '#252525', border: '1px solid #2e2e2e',
+            padding: '2px 10px', borderRadius: 999
           }}>{currency}</span>
         </p>
       </div>
 
-      {/* KPI Row 1 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
-        {([
-          { label: 'TOTAL REVENUE',        value: fmt(stats.totalRevenue),  sub: `${stats.paidCount} paid invoices`,  Icon: DollarSign,   accent: '#10b981' },
-          { label: 'TOTAL PROFIT',         value: fmt(stats.totalProfit),   sub: 'After expenses',                    Icon: TrendingUp,   accent: stats.totalProfit >= 0 ? '#10b981' : '#ef4444' },
-          { label: 'TOTAL EXPENSES',       value: fmt(stats.totalExpenses), sub: 'From expense invoices',             Icon: TrendingDown, accent: '#ef4444' },
-          { label: 'OUTSTANDING INVOICES', value: fmt(stats.outstanding),   sub: `${stats.outstandingCount} unpaid`,  Icon: AlertCircle,  accent: '#f59e0b' },
-        ] as const).map(c => (
-          <div key={c.label} style={card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: '#555', letterSpacing: '0.06em' }}>{c.label}</span>
-              <span style={{ background: c.accent + '18', color: c.accent, padding: '4px 6px', borderRadius: 8, display: 'flex', alignItems: 'center' }}>
-                <c.Icon size={13} />
-              </span>
+      {/* KPI Rows */}
+      {kpiCards.map((row, ri) => (
+        <div key={ri} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 12 }}>
+          {row.map(c => (
+            <div key={c.label} style={{
+              ...card,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0,
+              transition: 'border-color 0.2s',
+            }}>
+              {/* Top row: label + icon */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: '#888',
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  lineHeight: 1.3,
+                }}>
+                  {c.label}
+                </span>
+                <span style={{
+                  background: c.accent + '1a',
+                  color: c.accent,
+                  padding: '5px 6px',
+                  borderRadius: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  flexShrink: 0,
+                  marginLeft: 8,
+                }}>
+                  <c.Icon size={14} />
+                </span>
+              </div>
+              {/* Value */}
+              <p style={{
+                fontSize: 22,
+                fontWeight: 700,
+                color: '#f1f1f1',
+                fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1,
+                marginBottom: 6,
+              }}>
+                {c.value}
+              </p>
+              {/* Sub label */}
+              <p style={{ fontSize: 12, color: '#666', lineHeight: 1 }}>{c.sub}</p>
             </div>
-            <p style={{ fontSize: 20, fontWeight: 700, color: '#f1f1f1', fontVariantNumeric: 'tabular-nums' }}>{c.value}</p>
-            <p style={{ fontSize: 11, color: '#555', marginTop: 3 }}>{c.sub}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ))}
 
-      {/* KPI Row 2 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
-        {([
-          { label: 'MONTHLY RECURRING',  value: fmt(stats.monthlyRecurring), sub: new Date().toLocaleString('en', { month: 'long' }), Icon: DollarSign,  accent: '#6366f1' },
-          { label: 'ACTIVE PROJECTS',    value: String(stats.activeProjects),    sub: 'In pipeline', Icon: Briefcase,   accent: '#60a5fa' },
-          { label: 'COMPLETED PROJECTS', value: String(stats.completedProjects), sub: 'Deals won',   Icon: CheckCircle, accent: '#10b981' },
-          { label: 'TOTAL CLIENTS',      value: String(totalClients),            sub: `${totalClients} registered`, Icon: Users, accent: '#c084fc' },
-        ] as const).map(c => (
-          <div key={c.label} style={card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: '#555', letterSpacing: '0.06em' }}>{c.label}</span>
-              <span style={{ background: c.accent + '18', color: c.accent, padding: '4px 6px', borderRadius: 8, display: 'flex', alignItems: 'center' }}>
-                <c.Icon size={13} />
-              </span>
-            </div>
-            <p style={{ fontSize: 20, fontWeight: 700, color: '#f1f1f1', fontVariantNumeric: 'tabular-nums' }}>{c.value}</p>
-            <p style={{ fontSize: 11, color: '#555', marginTop: 3 }}>{c.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts — always 2 columns on wide, stack on narrow */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+      {/* Charts */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {[
           {
             title: 'Revenue & Profit',
@@ -448,8 +469,8 @@ export default function DashboardPage() {
             legend: [{ label: 'Income', color: 'rgba(99,179,237,0.9)' }, { label: 'Expenses', color: 'rgba(252,129,74,0.9)' }],
           },
         ].map(ch => (
-          <div key={ch.title} style={{ ...card, padding: '18px 20px' }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: '#f1f1f1', marginBottom: 16 }}>{ch.title}</p>
+          <div key={ch.title} style={{ ...card }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#e0e0e0', marginBottom: 16 }}>{ch.title}</p>
             <BarChart
               months={stats.months}
               series={ch.series}
@@ -460,92 +481,113 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Bottom Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+      {/* Bottom Row — equal 3-column grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
 
         {/* Recent Clients */}
         <div style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#f1f1f1' }}>Recent Clients</span>
-            <Users size={14} color="#555" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#e0e0e0' }}>Recent Clients</span>
+            <Users size={15} color="#555" />
           </div>
           {recentClients.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', gap: 8 }}>
-              <Users size={24} color="#333" />
-              <span style={{ fontSize: 12, color: '#555' }}>No clients yet</span>
-              <Link href="/dashboard/clients" style={{ fontSize: 11, color: '#6366f1' }}>Add your first client →</Link>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '28px 0', gap: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={18} color="#444" />
+              </div>
+              <span style={{ fontSize: 12, color: '#555', textAlign: 'center' }}>No clients yet</span>
+              <Link href="/dashboard/clients" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none' }}>Add your first client →</Link>
             </div>
           ) : (
-            recentClients.map(c => (
-              <Link key={c.id} href={`/dashboard/clients/${c.id}`}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 4px', borderRadius: 8, textDecoration: 'none', marginBottom: 4 }}
-              >
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6366f1', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                  {c.full_name?.[0]?.toUpperCase() ?? '?'}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontSize: 12, fontWeight: 500, color: '#f1f1f1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.full_name}</p>
-                  {c.company_name && <p style={{ fontSize: 11, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.company_name}</p>}
-                </div>
-              </Link>
-            ))
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {recentClients.map(c => (
+                <Link key={c.id} href={`/dashboard/clients/${c.id}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, textDecoration: 'none', background: 'transparent', transition: 'background 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#222')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                    {c.full_name?.[0]?.toUpperCase() ?? '?'}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 500, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.full_name}</p>
+                    {c.company_name && <p style={{ fontSize: 11, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.company_name}</p>}
+                  </div>
+                </Link>
+              ))}
+            </div>
           )}
         </div>
 
         {/* Upcoming Deadlines */}
         <div style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#f1f1f1' }}>Upcoming Deadlines</span>
-            <Clock size={14} color="#555" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#e0e0e0' }}>Upcoming Deadlines</span>
+            <Clock size={15} color="#555" />
           </div>
           {stats.upcomingDeadlines.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', gap: 8 }}>
-              <Clock size={24} color="#333" />
-              <span style={{ fontSize: 12, color: '#555' }}>No upcoming deadlines</span>
-              <Link href="/dashboard/projects" style={{ fontSize: 11, color: '#6366f1' }}>View projects →</Link>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '28px 0', gap: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock size={18} color="#444" />
+              </div>
+              <span style={{ fontSize: 12, color: '#555', textAlign: 'center' }}>No upcoming deadlines</span>
+              <Link href="/dashboard/projects" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none' }}>View projects →</Link>
             </div>
           ) : (
-            stats.upcomingDeadlines.map((p: any) => {
-              const days = Math.ceil((new Date(p.deadline).getTime() - Date.now()) / 86_400_000);
-              return (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: days <= 3 ? '#ef4444' : days <= 7 ? '#f59e0b' : '#10b981' }} />
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 500, color: '#f1f1f1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
-                    <p style={{ fontSize: 11, color: '#555' }}>{days}d · {p.client_name ?? '—'}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {stats.upcomingDeadlines.map((p: any) => {
+                const days = Math.ceil((new Date(p.deadline).getTime() - Date.now()) / 86_400_000);
+                const dotColor = days <= 3 ? '#ef4444' : days <= 7 ? '#f59e0b' : '#10b981';
+                return (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: dotColor, boxShadow: `0 0 6px ${dotColor}66` }} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
+                      <p style={{ fontSize: 11, color: '#555' }}>{days}d · {p.client_name ?? '—'}</p>
+                    </div>
+                    <span style={{ fontSize: 11, color: dotColor, fontWeight: 600, flexShrink: 0 }}>{days}d</span>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
 
         {/* Unpaid Invoices */}
         <div style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#f1f1f1' }}>Unpaid Invoices</span>
-            <FileText size={14} color="#555" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#e0e0e0' }}>Unpaid Invoices</span>
+            <FileText size={15} color="#555" />
           </div>
           {stats.unpaidInvoices.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', gap: 8 }}>
-              <FileText size={24} color="#333" />
-              <span style={{ fontSize: 12, color: '#555' }}>No unpaid invoices</span>
-              <Link href="/dashboard/invoices" style={{ fontSize: 11, color: '#6366f1' }}>View invoices →</Link>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '28px 0', gap: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileText size={18} color="#444" />
+              </div>
+              <span style={{ fontSize: 12, color: '#555', textAlign: 'center' }}>No unpaid invoices</span>
+              <Link href="/dashboard/finance" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none' }}>View invoices →</Link>
             </div>
           ) : (
-            stats.unpaidInvoices.slice(0, 5).map((inv: any) => (
-              <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontSize: 12, fontWeight: 500, color: '#f1f1f1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.invoice_number}</p>
-                  <p style={{ fontSize: 11, color: '#555' }}>{inv.client_name ?? '—'}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {stats.unpaidInvoices.slice(0, 5).map((inv: any) => (
+                <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 500, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.invoice_number}</p>
+                    <p style={{ fontSize: 11, color: '#555' }}>{inv.client_name ?? '—'}</p>
+                  </div>
+                  <span style={{
+                    color: '#f59e0b', fontSize: 12, fontWeight: 600,
+                    fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+                    background: '#f59e0b18', padding: '2px 8px', borderRadius: 6,
+                  }}>
+                    {fmt(convert(parseFloat(inv.total ?? inv.amount ?? 0), inv.currency || 'SAR'))}
+                  </span>
                 </div>
-                <span style={{ color: '#f59e0b', fontSize: 12, fontWeight: 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                  {fmt(convert(parseFloat(inv.total ?? inv.amount ?? 0), inv.currency || 'SAR'))}
-                </span>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
+
       </div>
     </div>
   );
