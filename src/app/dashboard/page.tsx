@@ -187,7 +187,6 @@ export default function DashboardPage() {
         data.user?.user_metadata?.name ||
         data.user?.email?.split('@')[0] ||
         '';
-      // Capitalize first letter only, preserve rest
       const name = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'there';
       setUserName(name);
     });
@@ -368,20 +367,102 @@ export default function DashboardPage() {
     padding: '18px 20px',
   };
 
-  const kpiCards = [
-    [
-      { label: 'Total Revenue',        value: fmt(stats.totalRevenue),  sub: `${stats.paidCount} paid invoice${stats.paidCount !== 1 ? 's' : ''}`,  Icon: DollarSign,   accent: '#10b981' },
-      { label: 'Total Profit',         value: fmt(stats.totalProfit),   sub: 'After expenses',                    Icon: TrendingUp,   accent: stats.totalProfit >= 0 ? '#10b981' : '#ef4444' },
-      { label: 'Total Expenses',       value: fmt(stats.totalExpenses), sub: 'From expense invoices',             Icon: TrendingDown, accent: '#ef4444' },
-      { label: 'Outstanding Invoices', value: fmt(stats.outstanding),   sub: `${stats.outstandingCount} unpaid`,  Icon: AlertCircle,  accent: '#f59e0b' },
-    ],
-    [
-      { label: 'Monthly Recurring',  value: fmt(stats.monthlyRecurring), sub: new Date().toLocaleString('en', { month: 'long' }), Icon: DollarSign,  accent: '#6366f1' },
-      { label: 'Active Projects',    value: String(stats.activeProjects),    sub: 'In pipeline', Icon: Briefcase,   accent: '#60a5fa' },
-      { label: 'Completed Projects', value: String(stats.completedProjects), sub: 'Deals won',   Icon: CheckCircle, accent: '#10b981' },
-      { label: 'Total Clients',      value: String(totalClients),            sub: `${totalClients} registered`, Icon: Users, accent: '#c084fc' },
-    ],
-  ] as const;
+  // All 8 KPI cards in two rows of 4
+  const row1 = [
+    { label: 'Total Revenue',        value: fmt(stats.totalRevenue),  sub: `${stats.paidCount} paid invoice${stats.paidCount !== 1 ? 's' : ''}`,  Icon: DollarSign,   accent: '#10b981' },
+    { label: 'Total Profit',         value: fmt(stats.totalProfit),   sub: 'After expenses',                    Icon: TrendingUp,   accent: stats.totalProfit >= 0 ? '#10b981' : '#ef4444' },
+    { label: 'Total Expenses',       value: fmt(stats.totalExpenses), sub: 'From expense invoices',             Icon: TrendingDown, accent: '#ef4444' },
+    { label: 'Outstanding',          value: fmt(stats.outstanding),   sub: `${stats.outstandingCount} unpaid`,  Icon: AlertCircle,  accent: '#f59e0b' },
+  ];
+
+  const row2 = [
+    { label: 'Monthly Recurring',  value: fmt(stats.monthlyRecurring), sub: new Date().toLocaleString('en', { month: 'long' }), Icon: DollarSign,  accent: '#6366f1' },
+    { label: 'Active Projects',    value: String(stats.activeProjects),    sub: 'In pipeline', Icon: Briefcase,   accent: '#60a5fa' },
+    { label: 'Completed Projects', value: String(stats.completedProjects), sub: 'Deals won',   Icon: CheckCircle, accent: '#10b981' },
+    { label: 'Total Clients',      value: String(totalClients),            sub: `${totalClients} registered`, Icon: Users, accent: '#c084fc' },
+  ];
+
+  const kpiCardStyle: React.CSSProperties = {
+    ...card,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 110,
+    boxSizing: 'border-box',
+  };
+
+  const renderKpiRow = (items: typeof row1) => (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      gap: 12,
+    }}>
+      {items.map(c => (
+        <div key={c.label} style={kpiCardStyle}>
+          {/* Top: label + icon — fixed height row */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 14,
+            height: 22,
+          }}>
+            <span style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#888',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1,
+              flex: 1,
+              minWidth: 0,
+            }}>
+              {c.label}
+            </span>
+            <span style={{
+              background: c.accent + '1a',
+              color: c.accent,
+              padding: '5px 6px',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              flexShrink: 0,
+              marginLeft: 8,
+            }}>
+              <c.Icon size={14} />
+            </span>
+          </div>
+          {/* Value */}
+          <p style={{
+            fontSize: 22,
+            fontWeight: 700,
+            color: '#f1f1f1',
+            fontVariantNumeric: 'tabular-nums',
+            lineHeight: 1,
+            marginBottom: 6,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            {c.value}
+          </p>
+          {/* Sub label */}
+          <p style={{
+            fontSize: 12,
+            color: '#666',
+            lineHeight: 1,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            {c.sub}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -399,59 +480,11 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* KPI Rows */}
-      {kpiCards.map((row, ri) => (
-        <div key={ri} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 12 }}>
-          {row.map(c => (
-            <div key={c.label} style={{
-              ...card,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 0,
-              transition: 'border-color 0.2s',
-            }}>
-              {/* Top row: label + icon */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                <span style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: '#888',
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  lineHeight: 1.3,
-                }}>
-                  {c.label}
-                </span>
-                <span style={{
-                  background: c.accent + '1a',
-                  color: c.accent,
-                  padding: '5px 6px',
-                  borderRadius: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  flexShrink: 0,
-                  marginLeft: 8,
-                }}>
-                  <c.Icon size={14} />
-                </span>
-              </div>
-              {/* Value */}
-              <p style={{
-                fontSize: 22,
-                fontWeight: 700,
-                color: '#f1f1f1',
-                fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1,
-                marginBottom: 6,
-              }}>
-                {c.value}
-              </p>
-              {/* Sub label */}
-              <p style={{ fontSize: 12, color: '#666', lineHeight: 1 }}>{c.sub}</p>
-            </div>
-          ))}
-        </div>
-      ))}
+      {/* KPI Row 1 */}
+      {renderKpiRow(row1)}
+
+      {/* KPI Row 2 */}
+      {renderKpiRow(row2)}
 
       {/* Charts */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
@@ -531,24 +564,24 @@ export default function DashboardPage() {
                 <Clock size={18} color="#444" />
               </div>
               <span style={{ fontSize: 12, color: '#555', textAlign: 'center' }}>No upcoming deadlines</span>
-              <Link href="/dashboard/projects" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none' }}>View projects →</Link>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {stats.upcomingDeadlines.map((p: any) => {
-                const days = Math.ceil((new Date(p.deadline).getTime() - Date.now()) / 86_400_000);
-                const dotColor = days <= 3 ? '#ef4444' : days <= 7 ? '#f59e0b' : '#10b981';
-                return (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: dotColor, boxShadow: `0 0 6px ${dotColor}66` }} />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <p style={{ fontSize: 12, fontWeight: 500, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
-                      <p style={{ fontSize: 11, color: '#555' }}>{days}d · {p.client_name ?? '—'}</p>
-                    </div>
-                    <span style={{ fontSize: 11, color: dotColor, fontWeight: 600, flexShrink: 0 }}>{days}d</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {stats.upcomingDeadlines.map(p => (
+                <Link key={p.id} href={`/dashboard/pipeline`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, textDecoration: 'none', background: 'transparent', transition: 'background 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#222')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(251,191,36,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fbbf24', flexShrink: 0 }}>
+                    <Clock size={13} />
                   </div>
-                );
-              })}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ fontSize: 12, fontWeight: 500, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
+                    <p style={{ fontSize: 11, color: '#555' }}>{new Date(p.deadline).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</p>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
         </div>
@@ -565,29 +598,29 @@ export default function DashboardPage() {
                 <FileText size={18} color="#444" />
               </div>
               <span style={{ fontSize: 12, color: '#555', textAlign: 'center' }}>No unpaid invoices</span>
-              <Link href="/dashboard/finance" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none' }}>View invoices →</Link>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {stats.unpaidInvoices.slice(0, 5).map((inv: any) => (
-                <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 500, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.invoice_number}</p>
-                    <p style={{ fontSize: 11, color: '#555' }}>{inv.client_name ?? '—'}</p>
+                <Link key={inv.id} href={`/dashboard/finance`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, textDecoration: 'none', background: 'transparent', transition: 'background 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#222')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', flexShrink: 0 }}>
+                    <FileText size={13} />
                   </div>
-                  <span style={{
-                    color: '#f59e0b', fontSize: 12, fontWeight: 600,
-                    fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
-                    background: '#f59e0b18', padding: '2px 8px', borderRadius: 6,
-                  }}>
-                    {fmt(convert(parseFloat(inv.total ?? inv.amount ?? 0), inv.currency || 'SAR'))}
-                  </span>
-                </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ fontSize: 12, fontWeight: 500, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {inv.client_name ?? 'Unknown'} — #{inv.invoice_number ?? inv.id?.slice(0, 6)}
+                    </p>
+                    <p style={{ fontSize: 11, color: '#ef4444' }}>{fmt(convert(inv.total ?? inv.amount, inv.currency || 'SAR'))}</p>
+                  </div>
+                </Link>
               ))}
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
