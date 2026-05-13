@@ -36,6 +36,8 @@ const FALLBACK_RATES: Record<string, number> = {
   MAD: 0.37,
 };
 
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'AED', 'MAD'];
+
 const CATEGORY_META: Record<Category, { label: string; icon: React.ElementType; color: string }> = {
   hosting: { label: 'Hosting', icon: Server, color: 'text-blue-400 bg-blue-400/10' },
   domain:  { label: 'Domain',  icon: Globe,  color: 'text-purple-400 bg-purple-400/10' },
@@ -84,14 +86,19 @@ export function SubscriptionsPage() {
     setRatesLoading(true);
     setRatesError(false);
     try {
-      const res = await fetch('https://api.frankfurter.app/latest?from=SAR&to=USD,EUR,GBP,AED,MAD');
+      // open.er-api.com — free, no key, full CORS support
+      const res = await fetch('https://open.er-api.com/v6/latest/SAR');
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
+      if (data.result !== 'success') throw new Error('API error');
+
       // data.rates = { USD: 0.266..., EUR: 0.244..., ... } (1 SAR = X foreign)
       // We need TO_SAR: 1 foreign = X SAR → invert
       const toSarRates: Record<string, number> = { SAR: 1 };
-      for (const [currency, rate] of Object.entries(data.rates as Record<string, number>)) {
-        toSarRates[currency] = 1 / rate;
+      for (const cur of CURRENCIES) {
+        if (data.rates[cur]) {
+          toSarRates[cur] = 1 / data.rates[cur];
+        }
       }
       setRates(toSarRates);
       setRatesUpdatedAt(new Date().toLocaleTimeString('en-SA', { hour: '2-digit', minute: '2-digit' }));
@@ -252,10 +259,12 @@ export function SubscriptionsPage() {
             ? 'bg-amber-400/10 border-amber-400/20'
             : 'bg-blue-400/10 border-blue-400/20'
         )}>
-          <span className="text-xs">{ratesError ? '⚠️' : '🔴'}</span>
+          <span className="text-xs">{ratesError ? '⚠️' : '🟢'}</span>
           <div className="flex-1">
             {ratesError ? (
               <p className="text-text-muted text-xs">Using fallback rates · Could not reach exchange API</p>
+            ) : ratesLoading ? (
+              <p className="text-text-muted text-xs">Fetching live rates...</p>
             ) : (
               <p className="text-text-muted text-xs">
                 <span className="text-blue-400 font-medium">Live rates</span>
