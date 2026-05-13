@@ -120,6 +120,7 @@ export default function DashboardPage() {
       upcomingDeadlines,
       unpaidInvoices: unpaidInv.map((i: any) => ({ ...i, client_name: clientMap[i.client_id] })),
       revenueByMonth, cashFlow,
+      paidCount: paid.length,
     };
   }, [rawInvoices, rawExpenses, rawProjects, clientMap, convert, currency]);
 
@@ -144,9 +145,9 @@ export default function DashboardPage() {
       {/* KPI Row 1 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'TOTAL REVENUE',       value: fmt(stats.totalRevenue),       sub: `${stats.unpaidInvoices.length} paid invoices`, icon: DollarSign,   color: 'text-accent bg-accent/10' },
+          { label: 'TOTAL REVENUE',       value: fmt(stats.totalRevenue),       sub: `${stats.paidCount} paid invoices`, icon: DollarSign,   color: 'text-accent bg-accent/10' },
           { label: 'TOTAL PROFIT',        value: fmt(stats.totalProfit),        sub: 'After expenses',  icon: TrendingUp,   color: stats.totalProfit >= 0 ? 'text-accent bg-accent/10' : 'text-red-400 bg-red-400/10' },
-          { label: 'TOTAL EXPENSES',      value: fmt(stats.totalExpenses),      sub: '0 expense records', icon: TrendingDown, color: 'text-red-400 bg-red-400/10' },
+          { label: 'TOTAL EXPENSES',      value: fmt(stats.totalExpenses),      sub: `${rawExpenses.length} expense records`, icon: TrendingDown, color: 'text-red-400 bg-red-400/10' },
           { label: 'OUTSTANDING INVOICES',value: fmt(stats.outstanding),        sub: `${stats.outstandingCount} unpaid`, icon: AlertCircle,  color: 'text-amber-400 bg-amber-400/10' },
         ].map(card => (
           <div key={card.label} className="bg-surface border border-border rounded-xl p-4">
@@ -166,7 +167,7 @@ export default function DashboardPage() {
           { label: 'MONTHLY RECURRING',  value: fmt(stats.monthlyRecurring), sub: new Date().toLocaleString('en',{month:'long'}), icon: DollarSign,  color: 'text-primary bg-primary/10' },
           { label: 'ACTIVE PROJECTS',    value: String(stats.activeProjects),       sub: 'In pipeline',   icon: Briefcase,   color: 'text-blue-400 bg-blue-400/10' },
           { label: 'COMPLETED PROJECTS', value: String(stats.completedProjects),    sub: 'Deals won',     icon: CheckCircle, color: 'text-accent bg-accent/10' },
-          { label: 'TOTAL CLIENTS',      value: String(totalClients),               sub: '0 registered',  icon: Users,       color: 'text-purple-400 bg-purple-400/10' },
+          { label: 'TOTAL CLIENTS',      value: String(totalClients),               sub: `${totalClients} registered`,  icon: Users,       color: 'text-purple-400 bg-purple-400/10' },
         ].map(card => (
           <div key={card.label} className="bg-surface border border-border rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
