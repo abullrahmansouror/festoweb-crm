@@ -29,15 +29,9 @@ function FestowebIcon({ size = 20 }: { size?: number }) {
 }
 
 function NavItem({
-  href,
-  icon: Icon,
-  label,
-  active,
+  href, icon: Icon, label, active,
 }: {
-  href: string;
-  icon: React.ElementType;
-  label: string;
-  active: boolean;
+  href: string; icon: React.ElementType; label: string; active: boolean;
 }) {
   return (
     <Link
@@ -71,17 +65,11 @@ function NavItem({
         }
       }}
     >
-      <Icon
-        size={15}
-        color={active ? '#a89ff9' : 'currentColor'}
-        style={{ flexShrink: 0 }}
-      />
+      <Icon size={15} color={active ? '#a89ff9' : 'currentColor'} style={{ flexShrink: 0 }} />
       <span style={{ flex: 1 }}>{label}</span>
       {active && (
         <span style={{
-          width: 5,
-          height: 5,
-          borderRadius: '50%',
+          width: 5, height: 5, borderRadius: '50%',
           background: '#7c6ff7',
           boxShadow: '0 0 8px rgba(124,111,247,0.9)',
           flexShrink: 0,
@@ -107,43 +95,21 @@ export function Sidebar() {
       flexShrink: 0,
     }}>
       {/* Logo */}
-      <div style={{
-        padding: '20px 18px 16px',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-      }}>
+      <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
           <div style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
+            width: 36, height: 36, borderRadius: 10,
             background: 'linear-gradient(135deg, rgba(124,111,247,0.18), rgba(6,214,160,0.1))',
             border: '1px solid rgba(124,111,247,0.22)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <FestowebIcon size={20} />
           </div>
           <div>
-            <p style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 700,
-              fontSize: 15,
-              color: '#eef2ff',
-              letterSpacing: '-0.02em',
-              lineHeight: 1.2,
-            }}>
+            <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#eef2ff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
               Festoweb
             </p>
-            <p style={{
-              fontSize: 10,
-              color: 'rgba(255,255,255,0.22)',
-              marginTop: 2,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              fontFamily: 'var(--font-body)',
-            }}>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', marginTop: 2, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'var(--font-body)' }}>
               CRM Platform
             </p>
           </div>
@@ -151,51 +117,60 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav style={{
-        flex: 1,
-        padding: '10px 10px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        overflowY: 'auto',
-      }}>
+      <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 1, overflowY: 'auto' }}>
         <p style={{
-          fontSize: 9.5,
-          fontWeight: 700,
-          color: 'rgba(255,255,255,0.16)',
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          padding: '8px 12px 6px',
-          marginBottom: 2,
-          fontFamily: 'var(--font-body)',
+          fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.16)',
+          letterSpacing: '0.12em', textTransform: 'uppercase',
+          padding: '8px 12px 6px', marginBottom: 2, fontFamily: 'var(--font-body)',
         }}>
-          Navigation
+          Workspace
         </p>
 
         {NAV_ITEMS.map(item => {
-          const active =
-            pathname === item.href ||
-            (item.href !== '/dashboard' && pathname.startsWith(item.href));
-          return (
-            <NavItem
-              key={item.href}
-              href={item.href}
-              icon={item.icon}
-              label={item.label}
-              active={active}
-            />
-          );
+          const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+          return <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} active={active} />;
         })}
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '10px 4px' }} />
+
+        <p style={{
+          fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.16)',
+          letterSpacing: '0.12em', textTransform: 'uppercase',
+          padding: '4px 12px 6px', fontFamily: 'var(--font-body)',
+        }}>
+          System
+        </p>
+        <NavItem href="/dashboard/settings" icon={Settings} label="Settings" active={pathname === '/dashboard/settings'} />
       </nav>
 
-      {/* Settings at bottom */}
-      <div style={{ padding: '10px 10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <NavItem
-          href="/dashboard/settings"
-          icon={Settings}
-          label="Settings"
-          active={pathname === '/dashboard/settings'}
-        />
+      {/* User profile */}
+      <div style={{
+        padding: '14px 16px',
+        borderTop: '1px solid rgba(255,255,255,0.05)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+      }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #7c6ff7 0%, #06d6a0 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'white', fontSize: 12, fontWeight: 700,
+          fontFamily: 'var(--font-display)', flexShrink: 0,
+          boxShadow: '0 0 0 2px rgba(124,111,247,0.18)',
+        }}>
+          A
+        </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ fontSize: 12.5, fontWeight: 600, color: '#eef2ff', fontFamily: 'var(--font-body)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            Abdulrhman
+          </p>
+          <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+            abullrahmansouror@gmail.com
+          </p>
+        </div>
+        <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#06d6a0', boxShadow: '0 0 6px rgba(6,214,160,0.7)', flexShrink: 0 }} />
       </div>
     </aside>
   );
