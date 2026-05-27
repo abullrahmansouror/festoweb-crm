@@ -2,27 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, GitBranch, DollarSign, BarChart2, Settings, CreditCard } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import {
+  LayoutDashboard, Users, GitBranch, DollarSign,
+  BarChart2, Settings, CreditCard,
+} from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/dashboard/clients', icon: Users, label: 'Clients' },
-  { href: '/dashboard/pipeline', icon: GitBranch, label: 'Pipeline' },
-  { href: '/dashboard/finance', icon: DollarSign, label: 'Finance' },
-  { href: '/dashboard/subscriptions', icon: CreditCard, label: 'Subscriptions' },
-  { href: '/dashboard/reports', icon: BarChart2, label: 'Reports' },
+  { href: '/dashboard',               icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/dashboard/clients',       icon: Users,           label: 'Clients' },
+  { href: '/dashboard/pipeline',      icon: GitBranch,       label: 'Pipeline' },
+  { href: '/dashboard/finance',       icon: DollarSign,      label: 'Finance' },
+  { href: '/dashboard/subscriptions', icon: CreditCard,      label: 'Subscriptions' },
+  { href: '/dashboard/reports',       icon: BarChart2,       label: 'Reports' },
 ];
 
-function FestowebIcon({ size = 22 }: { size?: number }) {
+function FestowebIcon({ size = 20 }: { size?: number }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 384 384"
-      width={size}
-      height={size}
-      aria-label="Festoweb"
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 384" width={size} height={size} aria-hidden="true">
       <path
         fill="#3dcf8e"
         fillRule="nonzero"
@@ -32,61 +28,174 @@ function FestowebIcon({ size = 22 }: { size?: number }) {
   );
 }
 
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  active,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '9px 12px',
+        borderRadius: 10,
+        textDecoration: 'none',
+        fontSize: 13.5,
+        fontWeight: active ? 600 : 400,
+        color: active ? '#eef2ff' : 'rgba(255,255,255,0.38)',
+        background: active ? 'rgba(124,111,247,0.1)' : 'transparent',
+        borderLeft: `2px solid ${active ? '#7c6ff7' : 'transparent'}`,
+        transition: 'color 0.15s, background 0.15s, border-color 0.15s',
+        letterSpacing: '-0.01em',
+        fontFamily: 'var(--font-body)',
+      }}
+      onMouseEnter={e => {
+        if (!active) {
+          e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+          e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+        }
+      }}
+      onMouseLeave={e => {
+        if (!active) {
+          e.currentTarget.style.color = 'rgba(255,255,255,0.38)';
+          e.currentTarget.style.background = 'transparent';
+        }
+      }}
+    >
+      <Icon
+        size={15}
+        color={active ? '#a89ff9' : 'currentColor'}
+        style={{ flexShrink: 0 }}
+      />
+      <span style={{ flex: 1 }}>{label}</span>
+      {active && (
+        <span style={{
+          width: 5,
+          height: 5,
+          borderRadius: '50%',
+          background: '#7c6ff7',
+          boxShadow: '0 0 8px rgba(124,111,247,0.9)',
+          flexShrink: 0,
+        }} />
+      )}
+    </Link>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 bg-surface border-r border-border h-screen flex flex-col sticky top-0">
+    <aside style={{
+      width: 232,
+      background: 'rgba(7, 9, 14, 0.97)',
+      borderRight: '1px solid rgba(255,255,255,0.06)',
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      position: 'sticky',
+      top: 0,
+      flexShrink: 0,
+    }}>
       {/* Logo */}
-      <div className="px-5 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#121212] flex items-center justify-center shrink-0">
+      <div style={{
+        padding: '20px 18px 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+          <div style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, rgba(124,111,247,0.18), rgba(6,214,160,0.1))',
+            border: '1px solid rgba(124,111,247,0.22)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
             <FestowebIcon size={20} />
           </div>
           <div>
-            <p className="text-text-primary font-bold text-sm leading-none">Festoweb</p>
-            <p className="text-text-faint text-xs mt-0.5">CRM</p>
+            <p style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
+              fontSize: 15,
+              color: '#eef2ff',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.2,
+            }}>
+              Festoweb
+            </p>
+            <p style={{
+              fontSize: 10,
+              color: 'rgba(255,255,255,0.22)',
+              marginTop: 2,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              fontFamily: 'var(--font-body)',
+            }}>
+              CRM Platform
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+      {/* Navigation */}
+      <nav style={{
+        flex: 1,
+        padding: '10px 10px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        overflowY: 'auto',
+      }}>
+        <p style={{
+          fontSize: 9.5,
+          fontWeight: 700,
+          color: 'rgba(255,255,255,0.16)',
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          padding: '8px 12px 6px',
+          marginBottom: 2,
+          fontFamily: 'var(--font-body)',
+        }}>
+          Navigation
+        </p>
+
         {NAV_ITEMS.map(item => {
           const active =
             pathname === item.href ||
             (item.href !== '/dashboard' && pathname.startsWith(item.href));
           return (
-            <Link
+            <NavItem
               key={item.href}
               href={item.href}
-              className={cn(
-                'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
-                active
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-text-muted hover:text-text-primary hover:bg-surface2'
-              )}
-            >
-              <item.icon size={15} />
-              {item.label}
-            </Link>
+              icon={item.icon}
+              label={item.label}
+              active={active}
+            />
           );
         })}
       </nav>
 
-      {/* Settings */}
-      <div className="p-3 border-t border-border">
-        <Link
+      {/* Settings at bottom */}
+      <div style={{ padding: '10px 10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <NavItem
           href="/dashboard/settings"
-          className={cn(
-            'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
-            pathname === '/dashboard/settings'
-              ? 'bg-primary/10 text-primary font-medium'
-              : 'text-text-muted hover:text-text-primary hover:bg-surface2'
-          )}
-        >
-          <Settings size={15} /> Settings
-        </Link>
+          icon={Settings}
+          label="Settings"
+          active={pathname === '/dashboard/settings'}
+        />
       </div>
     </aside>
   );

@@ -14,34 +14,113 @@ html {
   scroll-behavior: smooth;
 }
 
-body {
-  background-color: #121212;
-  color: #f1f1f1;
-  min-height: 100vh;
-}
-
-/* Ensure CSS vars work alongside Tailwind */
 :root {
-  --color-bg:           #121212;
-  --color-surface:      #1a1a1a;
-  --color-surface2:     #222222;
-  --color-border:       #2a2a2a;
-  --color-primary:      #6366f1;
-  --color-accent:       #10b981;
-  --color-text-primary: #f1f1f1;
-  --color-text-muted:   #a0a0a0;
-  --color-text-faint:   #555555;
+  /* Background layers */
+  --bg:       #07090e;
+  --surface:  #0d1117;
+  --surface2: #131820;
+  --surface3: #1a2030;
+
+  /* Borders */
+  --border:   rgba(255, 255, 255, 0.07);
+  --border-2: rgba(255, 255, 255, 0.04);
+
+  /* Brand */
+  --primary:       #7c6ff7;
+  --primary-light: #a89ff9;
+  --primary-dim:   rgba(124, 111, 247, 0.12);
+  --primary-glow:  rgba(124, 111, 247, 0.25);
+
+  /* Status */
+  --accent:  #06d6a0;
+  --warning: #fbbf24;
+  --danger:  #ff6b6b;
+  --info:    #60a5fa;
+  --special: #f472b6;
+
+  /* Text */
+  --text-1: #eef2ff;
+  --text-2: #94a3b8;
+  --text-3: #64748b;
+  --text-4: #334155;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #1a1a1a; }
-::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+body {
+  background-color: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-body, system-ui, sans-serif);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
 
-::selection { background: rgba(99,102,241,0.3); color: #f1f1f1; }
+/* Ambient background glows */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 45% at 72% -8%,  rgba(124, 111, 247, 0.08) 0%, transparent 58%),
+    radial-gradient(ellipse 50% 40% at -5%  85%,  rgba(6,  214, 160, 0.05) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
 
+/* Refined scrollbar */
+::-webkit-scrollbar          { width: 4px; height: 4px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: rgba(255, 255, 255, 0.08); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.14); }
+
+/* Selection */
+::selection { background: rgba(124, 111, 247, 0.25); color: var(--text-1); }
+
+/* Focus ring */
 :focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid rgba(124, 111, 247, 0.55);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 5px;
+}
+
+/* ── Keyframes ──────────────────────────────────────── */
+@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes fadeUp  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+/* ── Animation utilities ────────────────────────────── */
+.animate-fade-up { animation: fadeUp  0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in { animation: fadeIn  0.35s ease both; }
+
+.delay-50  { animation-delay:  50ms; }
+.delay-75  { animation-delay:  75ms; }
+.delay-100 { animation-delay: 100ms; }
+.delay-125 { animation-delay: 125ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-175 { animation-delay: 175ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-225 { animation-delay: 225ms; }
+.delay-250 { animation-delay: 250ms; }
+.delay-275 { animation-delay: 275ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-325 { animation-delay: 325ms; }
+.delay-350 { animation-delay: 350ms; }
+.delay-375 { animation-delay: 375ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-450 { animation-delay: 450ms; }
+.delay-500 { animation-delay: 500ms; }
+.delay-600 { animation-delay: 600ms; }
+.delay-700 { animation-delay: 700ms; }
+.delay-800 { animation-delay: 800ms; }
+
+/* ── Skeleton loader ────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.07) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
 }

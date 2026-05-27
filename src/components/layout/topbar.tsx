@@ -6,12 +6,12 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 export function Topbar() {
-  const [query, setQuery] = useState('');
+  const [query, setQuery]     = useState('');
   const [results, setResults] = useState<{ type: string; label: string; sub: string; href: string }[]>([]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const ref = useRef<HTMLDivElement>(null);
+  const ref    = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -29,8 +29,10 @@ export function Topbar() {
       const q = query.trim();
 
       const [clientsRes, invoicesRes] = await Promise.all([
-        supabase.from('clients').select('id, full_name, company_name, email').or(`full_name.ilike.%${q}%,company_name.ilike.%${q}%,email.ilike.%${q}%`).limit(5),
-        supabase.from('invoices').select('id, invoice_number, status, total, clients(full_name)').or(`invoice_number.ilike.%${q}%,status.ilike.%${q}%`).limit(5),
+        supabase.from('clients').select('id, full_name, company_name, email')
+          .or(`full_name.ilike.%${q}%,company_name.ilike.%${q}%,email.ilike.%${q}%`).limit(5),
+        supabase.from('invoices').select('id, invoice_number, status, total, clients(full_name)')
+          .or(`invoice_number.ilike.%${q}%,status.ilike.%${q}%`).limit(5),
       ]);
 
       const clientResults = (clientsRes.data || []).map((c: any) => ({
@@ -62,43 +64,139 @@ export function Topbar() {
   };
 
   return (
-    <header className="h-14 bg-surface border-b border-border flex items-center justify-between px-6 shrink-0">
-      <div ref={ref} className="relative w-64">
-        <div className="flex items-center gap-3 bg-surface2 rounded-lg px-3 py-2">
-          <Search size={15} className="text-text-faint shrink-0" />
+    <header style={{
+      height: 56,
+      background: 'rgba(7, 9, 14, 0.92)',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '0 24px',
+      flexShrink: 0,
+      position: 'relative',
+      zIndex: 40,
+    }}>
+      {/* Search */}
+      <div ref={ref} style={{ position: 'relative' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: 10,
+          padding: '8px 12px',
+          width: 260,
+          transition: 'border-color 0.15s, background 0.15s',
+        }}
+          onFocus={() => {}}
+        >
+          <Search size={14} color="rgba(255,255,255,0.28)" style={{ flexShrink: 0 }} />
           <input
             type="text"
             placeholder="Search clients, invoices..."
             value={query}
             onChange={e => setQuery(e.target.value)}
-            onFocus={() => results.length > 0 && setOpen(true)}
-            className="bg-transparent text-sm text-text-primary placeholder-text-faint focus:outline-none w-full"
+            onFocus={() => { if (results.length > 0) setOpen(true); }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              fontSize: 13,
+              color: '#eef2ff',
+              width: '100%',
+              fontFamily: 'var(--font-body)',
+            }}
           />
-          {query && (
-            <button onClick={() => { setQuery(''); setResults([]); setOpen(false); }}>
-              <X size={13} className="text-text-faint hover:text-text-primary" />
+          {query ? (
+            <button
+              onClick={() => { setQuery(''); setResults([]); setOpen(false); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+            >
+              <X size={13} color="rgba(255,255,255,0.28)" />
             </button>
+          ) : (
+            <span style={{
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 5,
+              padding: '2px 6px',
+              fontSize: 10,
+              color: 'rgba(255,255,255,0.22)',
+              flexShrink: 0,
+              letterSpacing: '0.02em',
+              fontFamily: 'var(--font-body)',
+            }}>
+              ⌘K
+            </span>
           )}
         </div>
 
         {open && (
-          <div className="absolute top-full mt-1 left-0 w-80 bg-surface border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+          <div style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            width: 340,
+            background: 'rgba(13, 17, 23, 0.98)',
+            border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: 12,
+            overflow: 'hidden',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,111,247,0.08)',
+            zIndex: 50,
+          }}>
             {loading ? (
-              <p className="text-xs text-text-faint px-4 py-3">Searching...</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', padding: '14px 16px', fontFamily: 'var(--font-body)' }}>
+                Searching…
+              </p>
             ) : results.length === 0 ? (
-              <p className="text-xs text-text-faint px-4 py-3">No results found</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', padding: '14px 16px', fontFamily: 'var(--font-body)' }}>
+                No results found
+              </p>
             ) : results.map((r, i) => (
               <button
                 key={i}
                 onClick={() => go(r.href)}
-                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-surface2 transition-colors text-left border-b border-border last:border-0"
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                  padding: '12px 16px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: i < results.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.12s',
+                  fontFamily: 'var(--font-body)',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 mt-0.5 ${
-                  r.type === 'Client' ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400'
-                }`}>{r.type}</span>
-                <div className="min-w-0">
-                  <p className="text-sm text-text-primary font-medium truncate">{r.label}</p>
-                  <p className="text-xs text-text-faint truncate">{r.sub}</p>
+                <span style={{
+                  fontSize: 10,
+                  padding: '3px 7px',
+                  borderRadius: 5,
+                  fontWeight: 600,
+                  flexShrink: 0,
+                  marginTop: 2,
+                  letterSpacing: '0.04em',
+                  ...(r.type === 'Client'
+                    ? { background: 'rgba(124,111,247,0.15)', color: '#a89ff9' }
+                    : { background: 'rgba(96,165,250,0.15)',  color: '#93c5fd' }),
+                }}>
+                  {r.type}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 13, color: '#eef2ff', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.label}
+                  </p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.sub}
+                  </p>
                 </div>
               </button>
             ))}
@@ -106,13 +204,64 @@ export function Topbar() {
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        <button className="relative p-2 rounded-lg hover:bg-surface2 transition-colors">
-          <Bell size={18} className="text-text-muted" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />
+      {/* Right side */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* Notification bell */}
+        <button
+          style={{
+            position: 'relative',
+            width: 34,
+            height: 34,
+            borderRadius: 9,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            cursor: 'pointer',
+            transition: 'background 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.11)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
+          }}
+        >
+          <Bell size={15} color="rgba(255,255,255,0.45)" />
+          <span style={{
+            position: 'absolute',
+            top: 7,
+            right: 7,
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: '#7c6ff7',
+            border: '1.5px solid #07090e',
+            boxShadow: '0 0 6px rgba(124,111,247,0.8)',
+          }} />
         </button>
-        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-          <span className="text-white text-sm font-bold">A</span>
+
+        {/* Avatar */}
+        <div style={{
+          width: 34,
+          height: 34,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #7c6ff7 0%, #06d6a0 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: 'pointer',
+          boxShadow: '0 0 0 2px rgba(124,111,247,0.2)',
+          fontFamily: 'var(--font-display)',
+          flexShrink: 0,
+        }}>
+          A
         </div>
       </div>
     </header>
